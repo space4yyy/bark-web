@@ -1125,7 +1125,8 @@ export default function Home() {
 
             <label className="field message-field">
               <span>
-                {useMarkdown ? tr("Markdown 内容", "Markdown message") : tr("通知内容", "Message")}
+                {useMarkdown ? tr("Markdown 内容", "Markdown message") : tr("通知内容", "Message")}{" "}
+                <em className="required-mark">{tr("必填", "Required")}</em>
               </span>
               <textarea
                 value={body}
@@ -1282,7 +1283,6 @@ export default function Home() {
                 <span>
                   {sending ? tr("发送中…", "Sending…") : tr("发送通知", "Send notification")}
                 </span>
-                <span aria-hidden="true">↗</span>
               </button>
             </div>
           </form>

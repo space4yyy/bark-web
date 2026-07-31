@@ -910,6 +910,11 @@ textarea:focus {
   font-weight: 400;
 }
 
+.field em.required-mark {
+  color: var(--red);
+  font-weight: 650;
+}
+
 .message-field {
   position: relative;
   margin: 20px 0;
@@ -1143,8 +1148,7 @@ textarea:focus {
   padding: 0 18px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 26px;
+  justify-content: center;
   border: 0;
   border-radius: 11px;
   background: var(--green);
@@ -1708,6 +1712,12 @@ textarea:focus {
 
   .composer-panel {
     padding: 32px 20px 42px;
+  }
+
+  .app-shell input:not([type="checkbox"]):not([type="range"]),
+  .app-shell select,
+  .app-shell textarea {
+    font-size: 16px;
   }
 
   .composer-heading {
