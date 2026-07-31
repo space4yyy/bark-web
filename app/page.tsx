@@ -390,16 +390,27 @@ export default function Home() {
         }),
       );
       const succeeded = results.filter((result) => result.status === "fulfilled");
-      const failed = results.length - succeeded.length;
-      if (failed === 0) {
+      const failures = results.filter(
+        (result): result is PromiseRejectedResult => result.status === "rejected",
+      );
+      const firstFailure =
+        failures[0]?.reason instanceof Error
+          ? failures[0].reason.message
+          : "未知错误";
+      if (failures.length === 0) {
         setNotice({
           type: "success",
           text: `已发送给 ${succeeded.length} 个设备`,
         });
+      } else if (succeeded.length === 0) {
+        setNotice({
+          type: "error",
+          text: `发送失败：${firstFailure}`,
+        });
       } else {
         setNotice({
           type: "error",
-          text: `${succeeded.length} 个成功，${failed} 个失败。请检查服务器、Key 或跨域设置。`,
+          text: `${succeeded.length} 个成功，${failures.length} 个失败：${firstFailure}`,
         });
       }
     } catch (error) {
