@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { parseBarkLink } from "./bark-links";
 
 type Device = {
   id: string;
@@ -16,7 +17,7 @@ type BarkServer = {
 };
 
 type StoredConfig = {
-  version: 1;
+  version: 2;
   activeServerId: string;
   servers: BarkServer[];
 };
@@ -29,16 +30,9 @@ type Notice = {
 const STORAGE_KEY = "bark-console-config-v1";
 
 const DEFAULT_CONFIG: StoredConfig = {
-  version: 1,
-  activeServerId: "official",
-  servers: [
-    {
-      id: "official",
-      name: "Bark 官方服务器",
-      url: "https://api.day.app",
-      devices: [],
-    },
-  ],
+  version: 2,
+  activeServerId: "",
+  servers: [],
 };
 
 const SOUNDS = [
@@ -176,10 +170,15 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [serverMenuOpen, setServerMenuOpen] = useState(false);
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
-  const [deviceName, setDeviceName] = useState("");
-  const [deviceKey, setDeviceKey] = useState("");
+  const [barkLinks, setBarkLinks] = useState("");
   const [serverName, setServerName] = useState("");
   const [serverUrl, setServerUrl] = useState("");
+  const [editingServerId, setEditingServerId] = useState<string | null>(null);
+  const [serverNameDraft, setServerNameDraft] = useState("");
+  const [serverUrlDraft, setServerUrlDraft] = useState("");
+  const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
+  const [deviceNameDraft, setDeviceNameDraft] = useState("");
+  const [deviceKeyDraft, setDeviceKeyDraft] = useState("");
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [body, setBody] = useState("");
@@ -201,9 +200,24 @@ export default function Home() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as StoredConfig;
-        if (parsed.version === 1 && Array.isArray(parsed.servers)) {
-          setConfig(parsed);
+        const parsed = JSON.parse(raw) as {
+          version?: number;
+          activeServerId?: string;
+          servers?: BarkServer[];
+        };
+        if (
+          (parsed.version === 1 || parsed.version === 2) &&
+          Array.isArray(parsed.servers)
+        ) {
+          const servers = parsed.servers.filter(
+            (server) => !(server.id === "official" && server.devices.length === 0),
+          );
+          const activeServerId = servers.some(
+            (server) => server.id === parsed.activeServerId,
+          )
+            ? String(parsed.activeServerId)
+            : (servers[0]?.id ?? "");
+          setConfig({ version: 2, activeServerId, servers });
         }
       }
     } catch {
@@ -217,10 +231,6 @@ export default function Home() {
     if (!ready) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
   }, [config, ready]);
-
-  useEffect(() => {
-    setSelectedDeviceIds([]);
-  }, [config.activeServerId]);
 
   useEffect(() => {
     if (!notice) return;
@@ -271,24 +281,75 @@ export default function Home() {
     }));
   }
 
-  function addDevice(event: FormEvent) {
+  function importBarkLinks(event: FormEvent) {
     event.preventDefault();
-    const name = deviceName.trim();
-    const key = deviceKey.trim().replace(/^\/+|\/+$/g, "");
-    if (!name || !key || !activeServer) return;
-    if (activeServer.devices.some((device) => device.key === key)) {
-      setNotice({ type: "error", text: "这个 Device Key 已存在于当前服务器。" });
+    const lines = barkLinks
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (lines.length === 0) return;
+
+    const parsed: Array<{ serverUrl: string; key: string }> = [];
+    const errors: string[] = [];
+    lines.forEach((line, index) => {
+      try {
+        parsed.push(parseBarkLink(line));
+      } catch (error) {
+        errors.push(
+          `第 ${index + 1} 行：${error instanceof Error ? error.message : "格式错误"}`,
+        );
+      }
+    });
+    if (errors.length > 0) {
+      setNotice({ type: "error", text: errors[0] });
       return;
     }
-    const device = { id: makeId(), name, key };
-    updateActiveServer((server) => ({
+
+    let added = 0;
+    let duplicates = 0;
+    let firstTargetServerId = "";
+    const newDeviceIds: string[] = [];
+    const servers = config.servers.map((server) => ({
       ...server,
-      devices: [...server.devices, device],
+      devices: [...server.devices],
     }));
-    setSelectedDeviceIds((ids) => [...ids, device.id]);
-    setDeviceName("");
-    setDeviceKey("");
-    setNotice({ type: "success", text: `已保存设备「${name}」` });
+    parsed.forEach(({ serverUrl: parsedServerUrl, key }) => {
+      let server = servers.find(
+        (item) => cleanServerUrl(item.url) === cleanServerUrl(parsedServerUrl),
+      );
+      if (!server) {
+        server = {
+          id: makeId(),
+          name: "未命名服务器",
+          url: parsedServerUrl,
+          devices: [],
+        };
+        servers.push(server);
+      }
+      if (!firstTargetServerId) firstTargetServerId = server.id;
+      if (server.devices.some((device) => device.key === key)) {
+        duplicates += 1;
+        return;
+      }
+      const device = { id: makeId(), name: "未命名设备", key };
+      server.devices.push(device);
+      newDeviceIds.push(device.id);
+      added += 1;
+    });
+    setConfig({
+      version: 2,
+      servers,
+      activeServerId: firstTargetServerId || config.activeServerId,
+    });
+    setSelectedDeviceIds(newDeviceIds);
+    setBarkLinks("");
+    setNotice({
+      type: "success",
+      text:
+        duplicates > 0
+          ? `已导入 ${added} 个设备，跳过 ${duplicates} 个重复 Key`
+          : `已导入 ${added} 个设备`,
+    });
   }
 
   function removeDevice(device: Device) {
@@ -302,9 +363,9 @@ export default function Home() {
 
   function addServer(event: FormEvent) {
     event.preventDefault();
-    const name = serverName.trim();
+    const name = serverName.trim() || "未命名服务器";
     const url = cleanServerUrl(serverUrl);
-    if (!name || !url) return;
+    if (!url) return;
     try {
       new URL(url);
     } catch {
@@ -319,14 +380,10 @@ export default function Home() {
     }));
     setServerName("");
     setServerUrl("");
-    setNotice({ type: "success", text: `已添加服务器「${name}」` });
+    setNotice({ type: "success", text: `已添加「${name}」` });
   }
 
   function removeServer(server: BarkServer) {
-    if (config.servers.length === 1) {
-      setNotice({ type: "error", text: "至少需要保留一个服务器。" });
-      return;
-    }
     if (!window.confirm(`删除「${server.name}」及其 ${server.devices.length} 个本地设备配置？`)) {
       return;
     }
@@ -336,9 +393,66 @@ export default function Home() {
       servers: remaining,
       activeServerId:
         config.activeServerId === server.id
-          ? remaining[0].id
+          ? (remaining[0]?.id ?? "")
           : config.activeServerId,
     });
+  }
+
+  function startEditingServer(server: BarkServer) {
+    setEditingServerId(server.id);
+    setServerNameDraft(server.name);
+    setServerUrlDraft(server.url);
+  }
+
+  function saveServerEdit(serverId: string) {
+    const name = serverNameDraft.trim() || "未命名服务器";
+    const url = cleanServerUrl(serverUrlDraft);
+    try {
+      const parsed = new URL(url);
+      if (!["http:", "https:"].includes(parsed.protocol)) throw new Error();
+    } catch {
+      setNotice({ type: "error", text: "请输入有效的 HTTP 或 HTTPS 服务器地址。" });
+      return;
+    }
+    setConfig((current) => ({
+      ...current,
+      servers: current.servers.map((server) =>
+        server.id === serverId ? { ...server, name, url } : server,
+      ),
+    }));
+    setEditingServerId(null);
+    setNotice({ type: "success", text: "服务器信息已更新。" });
+  }
+
+  function startEditingDevice(device: Device) {
+    setEditingDeviceId(device.id);
+    setDeviceNameDraft(device.name);
+    setDeviceKeyDraft(device.key);
+  }
+
+  function saveDeviceEdit(deviceId: string) {
+    const name = deviceNameDraft.trim() || "未命名设备";
+    const key = deviceKeyDraft.trim().replace(/^\/+|\/+$/g, "");
+    if (!key) {
+      setNotice({ type: "error", text: "Device Key 不能为空。" });
+      return;
+    }
+    if (
+      activeServer?.devices.some(
+        (device) => device.id !== deviceId && device.key === key,
+      )
+    ) {
+      setNotice({ type: "error", text: "当前服务器已经存在这个 Device Key。" });
+      return;
+    }
+    updateActiveServer((server) => ({
+      ...server,
+      devices: server.devices.map((device) =>
+        device.id === deviceId ? { ...device, name, key } : device,
+      ),
+    }));
+    setEditingDeviceId(null);
+    setNotice({ type: "success", text: "设备信息已更新。" });
   }
 
   function toggleDevice(id: string) {
@@ -448,15 +562,26 @@ export default function Home() {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const parsed = JSON.parse(String(reader.result)) as StoredConfig;
+        const parsed = JSON.parse(String(reader.result)) as {
+          version?: number;
+          activeServerId?: string;
+          servers?: BarkServer[];
+        };
         if (
-          parsed.version !== 1 ||
-          !Array.isArray(parsed.servers) ||
-          parsed.servers.length === 0
+          (parsed.version !== 1 && parsed.version !== 2) ||
+          !Array.isArray(parsed.servers)
         ) {
           throw new Error();
         }
-        setConfig(parsed);
+        setConfig({
+          version: 2,
+          servers: parsed.servers,
+          activeServerId:
+            parsed.servers.find((server) => server.id === parsed.activeServerId)
+              ?.id ??
+            parsed.servers[0]?.id ??
+            "",
+        });
         setNotice({ type: "success", text: "配置已从备份恢复。" });
       } catch {
         setNotice({ type: "error", text: "备份文件格式不正确。" });
@@ -527,12 +652,18 @@ export default function Home() {
                 type="button"
                 aria-haspopup="listbox"
                 aria-expanded={serverMenuOpen}
-                onClick={() => setServerMenuOpen((open) => !open)}
+                onClick={() =>
+                  config.servers.length
+                    ? setServerMenuOpen((open) => !open)
+                    : setShowSettings(true)
+                }
               >
-                <span>{activeServer?.name}</span>
-                <span className={`select-chevron ${serverMenuOpen ? "open" : ""}`} />
+                <span>{activeServer?.name ?? "尚未添加服务器"}</span>
+                {config.servers.length > 0 && (
+                  <span className={`select-chevron ${serverMenuOpen ? "open" : ""}`} />
+                )}
               </button>
-              {serverMenuOpen && (
+              {serverMenuOpen && config.servers.length > 0 && (
                 <div
                   className="server-select-menu"
                   role="listbox"
@@ -587,10 +718,12 @@ export default function Home() {
               onClick={() => setShowSettings(true)}
               aria-label="管理服务器"
             >
-              管理
+              编辑
             </button>
           </div>
-          <div className="server-address">{activeServer?.url}</div>
+          <div className="server-address">
+            {activeServer?.url ?? "粘贴 Bark 推送链接即可自动添加"}
+          </div>
 
           <div className="devices-title">
             <div>
@@ -639,36 +772,33 @@ export default function Home() {
             ) : (
               <div className="empty-state">
                 <span className="empty-phone">↗</span>
-                <strong>还没有接收设备</strong>
-                <p>保存 Device Key 后，就可以在这里选择设备并发送通知。</p>
+                <strong>{activeServer ? "还没有接收设备" : "从 Bark 链接开始"}</strong>
+                <p>
+                  {activeServer
+                    ? "导入包含 Device Key 的完整链接，即可添加到当前服务器。"
+                    : "下面粘贴 Bark App 中复制的推送链接，服务器和设备会自动创建。"}
+                </p>
               </div>
             )}
           </div>
 
-          <form className="add-device" onSubmit={addDevice}>
-            <h3>添加设备</h3>
+          <form className="add-device import-links" onSubmit={importBarkLinks}>
+            <h3>导入 Bark 链接</h3>
             <label>
-              <span>用户名 / 备注</span>
-              <input
-                value={deviceName}
-                onChange={(event) => setDeviceName(event.target.value)}
-                placeholder="例如：小明的 iPhone"
-                required
-              />
-            </label>
-            <label>
-              <span>Device Key</span>
-              <input
-                value={deviceKey}
-                onChange={(event) => setDeviceKey(event.target.value)}
-                placeholder="粘贴 Bark Device Key"
-                type="password"
+              <span>每行一个完整推送链接</span>
+              <textarea
+                value={barkLinks}
+                onChange={(event) => setBarkLinks(event.target.value)}
+                placeholder={
+                  "https://bark.example.com/DeviceKey/推送内容\nhttps://api.day.app/AnotherKey/推送内容"
+                }
                 autoComplete="off"
                 required
               />
             </label>
+            <p>自动解析服务器与 Device Key，链接中的推送内容不会保存。</p>
             <button className="secondary-button" type="submit">
-              <span>＋</span> 保存设备
+              <span>＋</span> {barkLinks.includes("\n") ? "批量导入" : "解析并添加"}
             </button>
           </form>
         </aside>
@@ -918,30 +1048,92 @@ export default function Home() {
             <div className="settings-section">
               <h3>服务器</h3>
               <div className="server-list">
-                {config.servers.map((server) => (
-                  <div className="server-item" key={server.id}>
-                    <span className="server-avatar">{server.name.slice(0, 1)}</span>
-                    <div>
-                      <strong>{server.name}</strong>
-                      <span>
-                        {server.url} · {server.devices.length} 个设备
-                      </span>
+                {config.servers.map((server) =>
+                  editingServerId === server.id ? (
+                    <div className="edit-card" key={server.id}>
+                      <label>
+                        <span>服务器名称</span>
+                        <input
+                          value={serverNameDraft}
+                          onChange={(event) => setServerNameDraft(event.target.value)}
+                          placeholder="未命名服务器"
+                        />
+                      </label>
+                      <label>
+                        <span>服务器地址</span>
+                        <input
+                          value={serverUrlDraft}
+                          onChange={(event) => setServerUrlDraft(event.target.value)}
+                          placeholder="https://bark.example.com"
+                        />
+                      </label>
+                      <div className="edit-actions">
+                        <button
+                          className="secondary-button"
+                          onClick={() => setEditingServerId(null)}
+                        >
+                          取消
+                        </button>
+                        <button
+                          className="save-button"
+                          onClick={() => saveServerEdit(server.id)}
+                        >
+                          保存
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      className="danger-text"
-                      onClick={() => removeServer(server)}
+                  ) : (
+                    <div
+                      className={`server-item ${
+                        server.id === activeServer?.id ? "current" : ""
+                      }`}
+                      key={server.id}
                     >
-                      删除
-                    </button>
+                      <button
+                        className="server-avatar"
+                        onClick={() =>
+                          setConfig((current) => ({
+                            ...current,
+                            activeServerId: server.id,
+                          }))
+                        }
+                        aria-label={`切换到 ${server.name}`}
+                      >
+                        {server.name.slice(0, 1)}
+                      </button>
+                      <div>
+                        <strong>{server.name}</strong>
+                        <span>
+                          {server.url} · {server.devices.length} 个设备
+                        </span>
+                      </div>
+                      <button
+                        className="edit-text"
+                        onClick={() => startEditingServer(server)}
+                      >
+                        编辑
+                      </button>
+                      <button
+                        className="danger-text"
+                        onClick={() => removeServer(server)}
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ),
+                )}
+                {config.servers.length === 0 && (
+                  <div className="settings-empty">
+                    <strong>还没有服务器</strong>
+                    <span>从左侧粘贴完整 Bark 链接，或在下方手动添加。</span>
                   </div>
-                ))}
+                )}
               </div>
               <form className="inline-form" onSubmit={addServer}>
                 <input
                   value={serverName}
                   onChange={(event) => setServerName(event.target.value)}
-                  placeholder="服务器名称"
-                  required
+                  placeholder="名称（可选）"
                 />
                 <input
                   value={serverUrl}
@@ -960,33 +1152,74 @@ export default function Home() {
             <div className="settings-section">
               <div className="section-title-row">
                 <h3>当前服务器的设备</h3>
-                <span>{activeServer?.name}</span>
+                <span>{activeServer?.name ?? "尚未选择服务器"}</span>
               </div>
               <div className="manage-device-list">
-                {activeServer?.devices.map((device) => (
-                  <div className="manage-device" key={device.id}>
-                    <span className="device-avatar">
-                      {device.name.slice(0, 1).toUpperCase()}
-                    </span>
-                    <div>
-                      <strong>{device.name}</strong>
-                      <code>{showKeys[device.id] ? device.key : maskKey(device.key)}</code>
+                {activeServer?.devices.map((device) =>
+                  editingDeviceId === device.id ? (
+                    <div className="edit-card device-edit-card" key={device.id}>
+                      <label>
+                        <span>设备名称</span>
+                        <input
+                          value={deviceNameDraft}
+                          onChange={(event) => setDeviceNameDraft(event.target.value)}
+                          placeholder="未命名设备"
+                        />
+                      </label>
+                      <label>
+                        <span>Device Key</span>
+                        <input
+                          value={deviceKeyDraft}
+                          onChange={(event) => setDeviceKeyDraft(event.target.value)}
+                          autoComplete="off"
+                        />
+                      </label>
+                      <div className="edit-actions">
+                        <button
+                          className="secondary-button"
+                          onClick={() => setEditingDeviceId(null)}
+                        >
+                          取消
+                        </button>
+                        <button
+                          className="save-button"
+                          onClick={() => saveDeviceEdit(device.id)}
+                        >
+                          保存
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      onClick={() =>
-                        setShowKeys((current) => ({
-                          ...current,
-                          [device.id]: !current[device.id],
-                        }))
-                      }
-                    >
-                      {showKeys[device.id] ? "隐藏" : "显示"}
-                    </button>
-                    <button className="danger-text" onClick={() => removeDevice(device)}>
-                      移除
-                    </button>
-                  </div>
-                ))}
+                  ) : (
+                    <div className="manage-device" key={device.id}>
+                      <span className="device-avatar">
+                        {device.name.slice(0, 1).toUpperCase()}
+                      </span>
+                      <div>
+                        <strong>{device.name}</strong>
+                        <code>{showKeys[device.id] ? device.key : maskKey(device.key)}</code>
+                      </div>
+                      <button
+                        onClick={() =>
+                          setShowKeys((current) => ({
+                            ...current,
+                            [device.id]: !current[device.id],
+                          }))
+                        }
+                      >
+                        {showKeys[device.id] ? "隐藏" : "显示"}
+                      </button>
+                      <button
+                        className="edit-text"
+                        onClick={() => startEditingDevice(device)}
+                      >
+                        编辑
+                      </button>
+                      <button className="danger-text" onClick={() => removeDevice(device)}>
+                        移除
+                      </button>
+                    </div>
+                  ),
+                )}
                 {!activeServer?.devices.length && (
                   <p className="settings-help">当前服务器还没有保存设备。</p>
                 )}
