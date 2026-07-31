@@ -89,10 +89,13 @@ export default function Home() {
   const [serverName, setServerName] = useState("");
   const [serverUrl, setServerUrl] = useState("");
   const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
   const [body, setBody] = useState("");
+  const [useMarkdown, setUseMarkdown] = useState(false);
   const [group, setGroup] = useState("");
   const [sound, setSound] = useState("");
   const [level, setLevel] = useState("active");
+  const [volume, setVolume] = useState("5");
   const [badge, setBadge] = useState("");
   const [icon, setIcon] = useState("");
   const [jumpUrl, setJumpUrl] = useState("");
@@ -236,18 +239,20 @@ export default function Home() {
     setNotice(null);
 
     const payloadBase: Record<string, string | number | boolean> = {
-      body: body.trim(),
       level,
-      isArchive: isArchive ? 1 : 0,
+      [useMarkdown ? "markdown" : "body"]: body.trim(),
     };
     if (title.trim()) payloadBase.title = title.trim();
+    if (subtitle.trim()) payloadBase.subtitle = subtitle.trim();
     if (group.trim()) payloadBase.group = group.trim();
     if (sound) payloadBase.sound = sound;
+    if (level === "critical") payloadBase.volume = volume;
     if (badge) payloadBase.badge = Number(badge);
     if (icon.trim()) payloadBase.icon = icon.trim();
     if (jumpUrl.trim()) payloadBase.url = jumpUrl.trim();
     if (copy.trim()) payloadBase.copy = copy.trim();
     if (autoCopy) payloadBase.autoCopy = 1;
+    if (isArchive) payloadBase.isArchive = 1;
 
     try {
       const results = await Promise.allSettled(
@@ -523,6 +528,17 @@ export default function Home() {
                 />
               </label>
               <label className="field">
+                <span>副标题 <em>可选</em></span>
+                <input
+                  value={subtitle}
+                  onChange={(event) => setSubtitle(event.target.value)}
+                  placeholder="显示在标题与正文之间"
+                />
+              </label>
+            </div>
+
+            <div className="field-row compact-row">
+              <label className="field">
                 <span>通知分组 <em>可选</em></span>
                 <input
                   value={group}
@@ -530,14 +546,29 @@ export default function Home() {
                   placeholder="例如：运维告警"
                 />
               </label>
+              <label className="switch-row markdown-switch">
+                <input
+                  type="checkbox"
+                  checked={useMarkdown}
+                  onChange={(event) => setUseMarkdown(event.target.checked)}
+                />
+                <span>
+                  <strong>使用 Markdown</strong>
+                  <small>支持标题、列表、链接与代码等基础格式</small>
+                </span>
+              </label>
             </div>
 
             <label className="field message-field">
-              <span>通知内容</span>
+              <span>{useMarkdown ? "Markdown 内容" : "通知内容"}</span>
               <textarea
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
-                placeholder="写下你想发送的内容…"
+                placeholder={
+                  useMarkdown
+                    ? "例如：**构建成功**\n\n- 版本：v1.2.0\n- 环境：生产"
+                    : "写下你想发送的内容…"
+                }
                 maxLength={1000}
                 required
               />
@@ -565,6 +596,25 @@ export default function Home() {
                 </select>
               </label>
             </div>
+
+            {level === "critical" && (
+              <label className="volume-field">
+                <span>
+                  <strong>重要警告音量</strong>
+                  <small>即使设备处于静音模式也会响铃</small>
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="10"
+                  step="1"
+                  value={volume}
+                  onChange={(event) => setVolume(event.target.value)}
+                  aria-label="重要警告音量"
+                />
+                <output>{volume} / 10</output>
+              </label>
+            )}
 
             <button
               className="advanced-toggle"

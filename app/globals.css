@@ -580,6 +580,29 @@ textarea:focus {
   margin: 20px 0;
 }
 
+.compact-row {
+  margin-top: 18px;
+}
+
+.markdown-switch {
+  align-self: end;
+}
+
+.markdown-switch > span {
+  display: grid;
+  gap: 2px;
+}
+
+.markdown-switch strong {
+  color: #3f4a43;
+  font-size: 11px;
+}
+
+.markdown-switch small {
+  color: var(--soft);
+  font-size: 9px;
+}
+
 .message-field textarea {
   min-height: 150px;
   padding: 14px;
@@ -634,6 +657,47 @@ textarea:focus {
   width: 15px;
   height: 15px;
   accent-color: var(--green);
+}
+
+.volume-field {
+  min-height: 62px;
+  margin-top: 18px;
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(180px, 1.5fr) 54px;
+  align-items: center;
+  gap: 18px;
+  border: 1px solid #edcfac;
+  border-radius: 10px;
+  background: #fff8ee;
+}
+
+.volume-field > span {
+  display: grid;
+  gap: 3px;
+}
+
+.volume-field strong {
+  color: #734c28;
+  font-size: 11px;
+}
+
+.volume-field small {
+  color: #a37b58;
+  font-size: 9px;
+}
+
+.volume-field input {
+  width: 100%;
+  accent-color: var(--orange);
+}
+
+.volume-field output {
+  color: #734c28;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: right;
 }
 
 .send-row {
@@ -884,6 +948,15 @@ textarea:focus {
   .advanced-grid {
     grid-template-columns: 1fr;
     gap: 14px;
+  }
+
+  .volume-field {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .volume-field output {
+    text-align: left;
   }
 }
 
