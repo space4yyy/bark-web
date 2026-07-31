@@ -5,6 +5,12 @@ import {
   defaultServerName,
   parseBarkImportLine,
 } from "./bark-links";
+import {
+  clearComposerPreferences,
+  DEFAULT_COMPOSER_PREFERENCES,
+  readComposerPreferences,
+  writeComposerPreferences,
+} from "./composer-preferences";
 
 type Device = {
   id: string;
@@ -270,6 +276,14 @@ export default function Home() {
             ? "zh"
             : "en",
       );
+      const preferences = readComposerPreferences(localStorage);
+      setUseMarkdown(preferences.useMarkdown);
+      setSound(preferences.sound);
+      setLevel(preferences.level);
+      setVolume(preferences.volume);
+      setAutoCopy(preferences.autoCopy);
+      setIsArchive(preferences.isArchive);
+      setShowAdvanced(preferences.showAdvanced);
     } catch {
       setNotice({ type: "error", text: "本地配置读取失败，已使用默认设置。" });
     } finally {
@@ -288,6 +302,28 @@ export default function Home() {
     localStorage.setItem(LOCALE_KEY, locale);
     document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
   }, [locale, ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    writeComposerPreferences(localStorage, {
+      useMarkdown,
+      sound,
+      level: level as "active" | "timeSensitive" | "passive" | "critical",
+      volume,
+      autoCopy,
+      isArchive,
+      showAdvanced,
+    });
+  }, [
+    autoCopy,
+    isArchive,
+    level,
+    ready,
+    showAdvanced,
+    sound,
+    useMarkdown,
+    volume,
+  ]);
 
   const tr = (zh: string, en: string) => (locale === "zh" ? zh : en);
   const deviceCount = (count: number) =>
@@ -753,6 +789,14 @@ export default function Home() {
       setConfig(DEFAULT_CONFIG);
       setSelectedDeviceIds([]);
       localStorage.removeItem(STORAGE_KEY);
+      clearComposerPreferences(localStorage);
+      setUseMarkdown(DEFAULT_COMPOSER_PREFERENCES.useMarkdown);
+      setSound(DEFAULT_COMPOSER_PREFERENCES.sound);
+      setLevel(DEFAULT_COMPOSER_PREFERENCES.level);
+      setVolume(DEFAULT_COMPOSER_PREFERENCES.volume);
+      setAutoCopy(DEFAULT_COMPOSER_PREFERENCES.autoCopy);
+      setIsArchive(DEFAULT_COMPOSER_PREFERENCES.isArchive);
+      setShowAdvanced(DEFAULT_COMPOSER_PREFERENCES.showAdvanced);
       setNotice({
         type: "success",
         text: tr("本地配置已清除。", "Local configuration cleared."),

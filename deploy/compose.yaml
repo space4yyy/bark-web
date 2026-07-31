@@ -1,0 +1,21 @@
+services:
+  bark-web:
+    image: ghcr.io/space4yyy/bark-web:latest
+    container_name: bark-web
+    restart: unless-stopped
+    init: true
+    networks:
+      - traefik
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "traefik"
+      traefik.http.routers.bark-web.rule: "Host(`bark-web.space4.ink`)"
+      traefik.http.routers.bark-web.entrypoints: "websecure"
+      traefik.http.routers.bark-web.tls: "true"
+      traefik.http.routers.bark-web.tls.certresolver: "le"
+      traefik.http.routers.bark-web.service: "bark-web"
+      traefik.http.services.bark-web.loadbalancer.server.port: "3000"
+
+networks:
+  traefik:
+    external: true
