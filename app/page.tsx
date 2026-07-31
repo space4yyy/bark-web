@@ -28,6 +28,7 @@ type Notice = {
 };
 
 const STORAGE_KEY = "bark-console-config-v1";
+const BACKUP_WARNING_KEY = "bark-console-backup-warning-dismissed-v1";
 
 const DEFAULT_CONFIG: StoredConfig = {
   version: 2,
@@ -168,6 +169,8 @@ export default function Home() {
   const [sending, setSending] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [backupWarningDismissed, setBackupWarningDismissed] = useState(false);
   const [serverMenuOpen, setServerMenuOpen] = useState(false);
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [barkLinks, setBarkLinks] = useState("");
@@ -220,6 +223,9 @@ export default function Home() {
           setConfig({ version: 2, activeServerId, servers });
         }
       }
+      setBackupWarningDismissed(
+        localStorage.getItem(BACKUP_WARNING_KEY) === "1",
+      );
     } catch {
       setNotice({ type: "error", text: "本地配置读取失败，已使用默认设置。" });
     } finally {
@@ -343,6 +349,7 @@ export default function Home() {
     });
     setSelectedDeviceIds(newDeviceIds);
     setBarkLinks("");
+    setShowImport(false);
     setNotice({
       type: "success",
       text:
@@ -626,6 +633,13 @@ export default function Home() {
             <span className="privacy-dot" />
             数据仅在此浏览器
           </span>
+          <button
+            className="header-add-button"
+            onClick={() => setShowImport(true)}
+          >
+            <span aria-hidden="true">＋</span>
+            <span>添加 Bark 地址</span>
+          </button>
           <button className="icon-button" onClick={() => setShowSettings(true)}>
             <span aria-hidden="true">⚙</span>
             <span>设置</span>
@@ -633,14 +647,28 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="local-warning" role="note">
-        <span className="warning-icon">!</span>
-        <div>
-          <strong>Device Key 只保存在当前浏览器，容易丢失</strong>
-          <p>清理浏览器数据、使用无痕模式或更换设备后都无法恢复。建议添加完成后立即导出备份。</p>
+      {!backupWarningDismissed && (
+        <div className="local-warning" role="note">
+          <span className="warning-icon">!</span>
+          <div>
+            <strong>Device Key 只保存在当前浏览器，容易丢失</strong>
+            <p>清理浏览器数据、使用无痕模式或更换设备后都无法恢复。建议添加完成后立即导出备份。</p>
+          </div>
+          <button className="warning-export" onClick={exportConfig}>
+            导出备份
+          </button>
+          <button
+            className="warning-close"
+            aria-label="关闭备份提醒"
+            onClick={() => {
+              setBackupWarningDismissed(true);
+              localStorage.setItem(BACKUP_WARNING_KEY, "1");
+            }}
+          >
+            ×
+          </button>
         </div>
-        <button onClick={exportConfig}>导出备份</button>
-      </div>
+      )}
 
       <div className="workspace">
         <aside className="device-panel">
@@ -655,7 +683,7 @@ export default function Home() {
                 onClick={() =>
                   config.servers.length
                     ? setServerMenuOpen((open) => !open)
-                    : setShowSettings(true)
+                    : setShowImport(true)
                 }
               >
                 <span>{activeServer?.name ?? "尚未添加服务器"}</span>
@@ -707,8 +735,8 @@ export default function Home() {
                       setShowSettings(true);
                     }}
                   >
-                    <span>＋</span>
-                    添加或管理服务器
+                    <span>⚙</span>
+                    管理服务器与设备
                   </button>
                 </div>
               )}
@@ -775,32 +803,12 @@ export default function Home() {
                 <strong>{activeServer ? "还没有接收设备" : "从 Bark 链接开始"}</strong>
                 <p>
                   {activeServer
-                    ? "导入包含 Device Key 的完整链接，即可添加到当前服务器。"
-                    : "下面粘贴 Bark App 中复制的推送链接，服务器和设备会自动创建。"}
+                    ? "点击右上角“添加 Bark 地址”，导入新的设备链接。"
+                    : "点击右上角“添加 Bark 地址”，服务器和设备会自动创建。"}
                 </p>
               </div>
             )}
           </div>
-
-          <form className="add-device import-links" onSubmit={importBarkLinks}>
-            <h3>导入 Bark 链接</h3>
-            <label>
-              <span>每行一个完整推送链接</span>
-              <textarea
-                value={barkLinks}
-                onChange={(event) => setBarkLinks(event.target.value)}
-                placeholder={
-                  "https://bark.example.com/DeviceKey/推送内容\nhttps://api.day.app/AnotherKey/推送内容"
-                }
-                autoComplete="off"
-                required
-              />
-            </label>
-            <p>自动解析服务器与 Device Key，链接中的推送内容不会保存。</p>
-            <button className="secondary-button" type="submit">
-              <span>＋</span> {barkLinks.includes("\n") ? "批量导入" : "解析并添加"}
-            </button>
-          </form>
         </aside>
 
         <section className="composer-panel">
@@ -1021,6 +1029,69 @@ export default function Home() {
           </form>
         </section>
       </div>
+
+      {showImport && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={() => setShowImport(false)}
+        >
+          <section
+            className="import-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="import-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <span className="eyebrow">快速导入</span>
+                <h2 id="import-title">添加 Bark 地址</h2>
+              </div>
+              <button
+                className="close-button"
+                onClick={() => setShowImport(false)}
+                aria-label="关闭添加窗口"
+              >
+                ×
+              </button>
+            </div>
+            <form className="import-modal-form" onSubmit={importBarkLinks}>
+              <label>
+                <span>完整 Bark 推送链接</span>
+                <textarea
+                  value={barkLinks}
+                  onChange={(event) => setBarkLinks(event.target.value)}
+                  placeholder={
+                    "https://bark.example.com/DeviceKey/推送内容\nhttps://api.day.app/AnotherKey/推送内容"
+                  }
+                  autoComplete="off"
+                  autoFocus
+                  required
+                />
+              </label>
+              <div className="import-example">
+                <strong>支持多行导入</strong>
+                <p>
+                  每行粘贴一个地址。系统会自动提取服务器和 Device Key，
+                  链接中的推送内容不会保存。
+                </p>
+              </div>
+              <div className="import-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => setShowImport(false)}
+                >
+                  取消
+                </button>
+                <button type="submit" className="save-button">
+                  {barkLinks.includes("\n") ? "批量导入" : "解析并添加"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
 
       {showSettings && (
         <div className="modal-backdrop" onMouseDown={() => setShowSettings(false)}>
