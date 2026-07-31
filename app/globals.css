@@ -1720,6 +1720,11 @@ textarea:focus {
     font-size: 16px;
   }
 
+  .import-modal-form textarea::placeholder {
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
   .composer-heading {
     display: block;
   }
