@@ -873,7 +873,7 @@ export default function Home() {
                 <input
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
-                  placeholder="例如：服务器状态更新"
+                  placeholder="例如：今日提醒"
                 />
               </label>
               <label className="field">
@@ -892,7 +892,7 @@ export default function Home() {
                 <input
                   value={group}
                   onChange={(event) => setGroup(event.target.value)}
-                  placeholder="例如：运维告警"
+                  placeholder="例如：日常通知"
                 />
               </label>
               <div className="field format-field">
@@ -927,7 +927,7 @@ export default function Home() {
                 onChange={(event) => setBody(event.target.value)}
                 placeholder={
                   useMarkdown
-                    ? "例如：**构建成功**\n\n- 版本：v1.2.0\n- 环境：生产"
+                    ? "例如：**今日计划**\n\n- 领取快递\n- 晚上七点散步"
                     : "写下你想发送的内容…"
                 }
                 maxLength={1000}
