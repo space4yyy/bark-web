@@ -16,6 +16,7 @@ services:
       traefik.http.routers.bark-web.service: "bark-web"
       traefik.http.routers.bark-web.middlewares: "bark-web-self-hosted"
       traefik.http.middlewares.bark-web-self-hosted.headers.customrequestheaders.oai-authenticated-user-id: "self-hosted"
+      traefik.http.middlewares.bark-web-self-hosted.headers.customrequestheaders.origin: ""
       traefik.http.services.bark-web.loadbalancer.server.port: "3000"
 
 networks:
