@@ -1398,9 +1398,9 @@ export default function Home() {
               </h2>
               <p id="confirm-description">
                 {confirmTarget.kind === "device" &&
-                  `「${confirmTarget.device.name}」的 Device Key 将从此浏览器移除。`}
+                  `设备“${confirmTarget.device.name}”的 Device Key 将从此浏览器移除。`}
                 {confirmTarget.kind === "server" &&
-                  `「${confirmTarget.server.name}」及其 ${confirmTarget.server.devices.length} 个设备配置将被删除。`}
+                  `服务器“${confirmTarget.server.name}”及其 ${confirmTarget.server.devices.length} 个设备配置将被删除。`}
                 {confirmTarget.kind === "clear" &&
                   "所有服务器、设备名称和 Device Key 都将从此浏览器删除。"}
               </p>

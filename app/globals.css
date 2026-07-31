@@ -1278,9 +1278,12 @@ textarea:focus {
 
 .confirm-copy p {
   margin: 9px 0 4px;
+  padding: 0;
   color: var(--muted);
   font-size: 11px;
   line-height: 1.55;
+  text-align: left;
+  text-indent: 0;
 }
 
 .confirm-copy small {
