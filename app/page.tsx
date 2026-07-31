@@ -411,6 +411,13 @@ export default function Home() {
       ) ?? [],
     [activeServer, selectedDeviceIds],
   );
+  const selectedDeviceNames = useMemo(
+    () =>
+      selectedDevices
+        .map((device) => device.name)
+        .join(locale === "zh" ? "、" : ", "),
+    [locale, selectedDevices],
+  );
 
   function updateActiveServer(updater: (server: BarkServer) => BarkServer) {
     setConfig((current) => ({
@@ -1174,12 +1181,7 @@ export default function Home() {
               <small>{tr("接收设备", "Recipients")}</small>
               <strong>
                 {selectedDevices.length
-                  ? selectedDevices.length === 1
-                    ? selectedDevices[0].name
-                    : tr(
-                        `${selectedDevices[0].name} 等 ${selectedDevices.length} 个设备`,
-                        `${selectedDevices[0].name} and ${selectedDevices.length - 1} more`,
-                      )
+                  ? selectedDeviceNames
                   : tr("尚未选择设备", "No recipients selected")}
               </strong>
             </span>
@@ -1579,7 +1581,7 @@ export default function Home() {
             <div className="mobile-send-bar mobile-only">
               <span>
                 {selectedDevices.length
-                  ? deviceCount(selectedDevices.length)
+                  ? selectedDeviceNames
                   : tr("未选择接收设备", "No recipients")}
               </span>
               <button

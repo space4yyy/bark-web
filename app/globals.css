@@ -2109,9 +2109,13 @@ textarea:focus {
 
   .mobile-send-bar > span {
     min-width: 0;
+    flex: 1;
+    overflow: hidden;
     color: var(--muted);
     font-size: 10px;
     font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .mobile-send-bar > button {
