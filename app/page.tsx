@@ -1,7 +1,10 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { parseBarkLink } from "./bark-links";
+import {
+  defaultServerName,
+  parseBarkImportLine,
+} from "./bark-links";
 
 type Device = {
   id: string;
@@ -212,9 +215,19 @@ export default function Home() {
           (parsed.version === 1 || parsed.version === 2) &&
           Array.isArray(parsed.servers)
         ) {
-          const servers = parsed.servers.filter(
-            (server) => !(server.id === "official" && server.devices.length === 0),
-          );
+          const servers = parsed.servers
+            .filter(
+              (server) =>
+                !(server.id === "official" && server.devices.length === 0),
+            )
+            .map((server) => {
+              if (server.name !== "未命名服务器") return server;
+              try {
+                return { ...server, name: defaultServerName(server.url) };
+              } catch {
+                return server;
+              }
+            });
           const activeServerId = servers.some(
             (server) => server.id === parsed.activeServerId,
           )
@@ -289,17 +302,18 @@ export default function Home() {
 
   function importBarkLinks(event: FormEvent) {
     event.preventDefault();
-    const lines = barkLinks
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
+    const lines = barkLinks.split(/\r?\n/).filter((line) => line.length > 0);
     if (lines.length === 0) return;
 
-    const parsed: Array<{ serverUrl: string; key: string }> = [];
+    const parsed: Array<{
+      serverUrl: string;
+      key: string;
+      deviceName: string;
+    }> = [];
     const errors: string[] = [];
     lines.forEach((line, index) => {
       try {
-        parsed.push(parseBarkLink(line));
+        parsed.push(parseBarkImportLine(line));
       } catch (error) {
         errors.push(
           `第 ${index + 1} 行：${error instanceof Error ? error.message : "格式错误"}`,
@@ -319,14 +333,14 @@ export default function Home() {
       ...server,
       devices: [...server.devices],
     }));
-    parsed.forEach(({ serverUrl: parsedServerUrl, key }) => {
+    parsed.forEach(({ serverUrl: parsedServerUrl, key, deviceName }) => {
       let server = servers.find(
         (item) => cleanServerUrl(item.url) === cleanServerUrl(parsedServerUrl),
       );
       if (!server) {
         server = {
           id: makeId(),
-          name: "未命名服务器",
+          name: defaultServerName(parsedServerUrl),
           url: parsedServerUrl,
           devices: [],
         };
@@ -337,7 +351,7 @@ export default function Home() {
         duplicates += 1;
         return;
       }
-      const device = { id: makeId(), name: "未命名设备", key };
+      const device = { id: makeId(), name: deviceName, key };
       server.devices.push(device);
       newDeviceIds.push(device.id);
       added += 1;
@@ -370,11 +384,13 @@ export default function Home() {
 
   function addServer(event: FormEvent) {
     event.preventDefault();
-    const name = serverName.trim() || "未命名服务器";
     const url = cleanServerUrl(serverUrl);
     if (!url) return;
+    let name = serverName.trim();
     try {
-      new URL(url);
+      const parsed = new URL(url);
+      if (!["http:", "https:"].includes(parsed.protocol)) throw new Error();
+      if (!name) name = defaultServerName(url);
     } catch {
       setNotice({ type: "error", text: "请输入完整的服务器地址，例如 https://api.day.app" });
       return;
@@ -1062,7 +1078,7 @@ export default function Home() {
                   value={barkLinks}
                   onChange={(event) => setBarkLinks(event.target.value)}
                   placeholder={
-                    "https://bark.example.com/DeviceKey/推送内容\nhttps://api.day.app/AnotherKey/推送内容"
+                    "space4 https://bark.example.com/DeviceKey/推送内容\nipad https://api.day.app/AnotherKey/推送内容"
                   }
                   autoComplete="off"
                   autoFocus
@@ -1070,9 +1086,9 @@ export default function Home() {
                 />
               </label>
               <div className="import-example">
-                <strong>支持多行导入</strong>
+                <strong>支持设备名称与多行导入</strong>
                 <p>
-                  每行粘贴一个地址。系统会自动提取服务器和 Device Key，
+                  每行使用“设备名 + 一个半角空格 + 完整链接”。格式不规范时整批拒绝写入，
                   链接中的推送内容不会保存。
                 </p>
               </div>
