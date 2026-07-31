@@ -11,6 +11,12 @@ function jsonError(status: number, message: string) {
   return Response.json({ code: status, message }, { status });
 }
 
+function requestMessage(request: Request, zh: string, en: string) {
+  return request.headers.get("accept-language")?.toLowerCase().startsWith("zh")
+    ? zh
+    : en;
+}
+
 function isLocalHostname(hostname: string) {
   return (
     hostname === "localhost" ||
@@ -59,50 +65,50 @@ export async function handleBarkProxyRequest(
   fetcher: Fetcher = fetch,
 ): Promise<Response> {
   if (request.method !== "POST") {
-    return jsonError(405, "仅支持 POST 请求。");
+    return jsonError(405, requestMessage(request, "仅支持 POST 请求。", "Only POST requests are supported."));
   }
 
   const requestUrl = new URL(request.url);
   const isLocal = isLocalHostname(requestUrl.hostname);
   const origin = request.headers.get("origin");
   if (origin && origin !== requestUrl.origin) {
-    return jsonError(403, "请求来源无效。");
+    return jsonError(403, requestMessage(request, "请求来源无效。", "The request origin is invalid."));
   }
   if (!isLocal && !request.headers.get("oai-authenticated-user-id")) {
-    return jsonError(401, "请先登录后再发送通知。");
+    return jsonError(401, requestMessage(request, "请先登录后再发送通知。", "Sign in before sending a notification."));
   }
 
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (contentLength > MAX_REQUEST_BYTES) {
-    return jsonError(413, "通知内容过大。");
+    return jsonError(413, requestMessage(request, "通知内容过大。", "The notification payload is too large."));
   }
 
   let body: BarkProxyBody;
   try {
     body = (await request.json()) as BarkProxyBody;
   } catch {
-    return jsonError(400, "请求内容不是有效的 JSON。");
+    return jsonError(400, requestMessage(request, "请求内容不是有效的 JSON。", "The request body is not valid JSON."));
   }
 
   if (typeof body.server_url !== "string" || !hasValidPayload(body.payload)) {
-    return jsonError(400, "服务器地址或通知内容不完整。");
+    return jsonError(400, requestMessage(request, "服务器地址或通知内容不完整。", "The server URL or notification payload is incomplete."));
   }
 
   let serverUrl: URL;
   try {
     serverUrl = new URL(body.server_url);
   } catch {
-    return jsonError(400, "Bark 服务器地址无效。");
+    return jsonError(400, requestMessage(request, "Bark 服务器地址无效。", "The Bark server URL is invalid."));
   }
 
   if (!["http:", "https:"].includes(serverUrl.protocol)) {
-    return jsonError(400, "Bark 服务器仅支持 HTTP 或 HTTPS。");
+    return jsonError(400, requestMessage(request, "Bark 服务器仅支持 HTTP 或 HTTPS。", "Bark servers must use HTTP or HTTPS."));
   }
   if (serverUrl.username || serverUrl.password || serverUrl.search || serverUrl.hash) {
-    return jsonError(400, "服务器地址不能包含账号、查询参数或锚点。");
+    return jsonError(400, requestMessage(request, "服务器地址不能包含账号、查询参数或锚点。", "The server URL cannot contain credentials, query parameters, or a fragment."));
   }
   if (!isLocal && (serverUrl.protocol !== "https:" || isPrivateHostname(serverUrl.hostname))) {
-    return jsonError(400, "线上版本仅支持可公开访问的 HTTPS Bark 服务器。");
+    return jsonError(400, requestMessage(request, "线上版本仅支持可公开访问的 HTTPS Bark 服务器。", "The hosted version only supports publicly reachable HTTPS Bark servers."));
   }
 
   const targetUrl = `${serverUrl.toString().replace(/\/+$/, "")}/push`;
@@ -127,6 +133,6 @@ export async function handleBarkProxyRequest(
       },
     });
   } catch {
-    return jsonError(502, "无法连接 Bark 服务器，请检查地址、HTTPS 和网络可达性。");
+    return jsonError(502, requestMessage(request, "无法连接 Bark 服务器，请检查地址、HTTPS 和网络可达性。", "The Bark server could not be reached. Check the URL, HTTPS, and network access."));
   }
 }

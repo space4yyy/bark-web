@@ -168,6 +168,25 @@ select {
   font-size: 13px;
 }
 
+.language-toggle {
+  height: 38px;
+  min-width: 44px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+
+.language-toggle:hover {
+  border-color: #b7c4ba;
+  background: #f8fbf8;
+}
+
 .header-add-button {
   height: 38px;
   padding: 0 14px;

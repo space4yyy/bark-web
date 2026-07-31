@@ -35,8 +35,11 @@ type ConfirmTarget =
   | { kind: "device"; device: Device }
   | { kind: "clear" };
 
+type Locale = "zh" | "en";
+
 const STORAGE_KEY = "bark-console-config-v1";
 const BACKUP_WARNING_KEY = "bark-console-backup-warning-dismissed-v1";
+const LOCALE_KEY = "bark-console-locale-v1";
 
 const DEFAULT_CONFIG: StoredConfig = {
   version: 2,
@@ -45,7 +48,7 @@ const DEFAULT_CONFIG: StoredConfig = {
 };
 
 const SOUNDS = [
-  ["", "默认铃声"],
+  ["", "Default", "默认铃声"],
   ["alarm", "Alarm"],
   ["anticipate", "Anticipate"],
   ["bell", "Bell"],
@@ -62,15 +65,25 @@ const SOUNDS = [
   ["paymentsuccess", "Payment Success"],
   ["shake", "Shake"],
   ["sherwoodforest", "Sherwood Forest"],
-  ["silence", "静音"],
+  ["silence", "Silence", "静音"],
 ];
 
 const LEVELS = [
-  ["active", "主动提醒", "立即亮屏并显示通知"],
-  ["timeSensitive", "时效性通知", "可在专注模式下显示"],
-  ["passive", "静默通知", "仅加入通知中心"],
-  ["critical", "重要警告", "静音模式下仍可响铃"],
+  ["active", "Active", "主动提醒", "Lights up the screen immediately", "立即亮屏并显示通知"],
+  ["timeSensitive", "Time Sensitive", "时效性通知", "Can appear during Focus", "可在专注模式下显示"],
+  ["passive", "Passive", "静默通知", "Adds the notification silently", "仅加入通知中心"],
+  ["critical", "Critical", "重要警告", "Can play a sound in Silent mode", "静音模式下仍可响铃"],
 ];
+
+const LINK_ERROR_EN: Record<string, string> = {
+  "仅支持 HTTP 或 HTTPS 链接": "Only HTTP or HTTPS links are supported",
+  "链接中缺少 Device Key": "The link does not contain a Device Key",
+  "无法从链接中识别 Device Key": "A valid Device Key could not be found in the link",
+  "行首和行尾不能有空格": "Leading and trailing spaces are not allowed",
+  "设备名和链接之间只能使用一个半角空格":
+    "Use exactly one regular space between the device name and link",
+  "设备名或 Bark 链接为空": "The device name or Bark link is empty",
+};
 
 type SelectMenuOption = {
   value: string;
@@ -172,6 +185,7 @@ function maskKey(key: string) {
 export default function Home() {
   const [config, setConfig] = useState<StoredConfig>(DEFAULT_CONFIG);
   const [ready, setReady] = useState(false);
+  const [locale, setLocale] = useState<Locale>("zh");
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [sending, setSending] = useState(false);
@@ -208,6 +222,9 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const serverMenuRef = useRef<HTMLDivElement>(null);
 
+  /* Browser storage is only available after hydration, so this one-time
+     initialization intentionally restores React state from localStorage. */
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -245,17 +262,36 @@ export default function Home() {
       setBackupWarningDismissed(
         localStorage.getItem(BACKUP_WARNING_KEY) === "1",
       );
+      const savedLocale = localStorage.getItem(LOCALE_KEY);
+      setLocale(
+        savedLocale === "zh" || savedLocale === "en"
+          ? savedLocale
+          : navigator.language.toLowerCase().startsWith("zh")
+            ? "zh"
+            : "en",
+      );
     } catch {
       setNotice({ type: "error", text: "本地配置读取失败，已使用默认设置。" });
     } finally {
       setReady(true);
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!ready) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
   }, [config, ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    localStorage.setItem(LOCALE_KEY, locale);
+    document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
+  }, [locale, ready]);
+
+  const tr = (zh: string, en: string) => (locale === "zh" ? zh : en);
+  const deviceCount = (count: number) =>
+    locale === "zh" ? `${count} 个设备` : `${count} ${count === 1 ? "device" : "devices"}`;
 
   useEffect(() => {
     if (!notice) return;
@@ -322,7 +358,13 @@ export default function Home() {
         parsed.push(parseBarkImportLine(line));
       } catch (error) {
         errors.push(
-          `第 ${index + 1} 行：${error instanceof Error ? error.message : "格式错误"}`,
+          locale === "zh"
+            ? `第 ${index + 1} 行：${error instanceof Error ? error.message : "格式错误"}`
+            : `Line ${index + 1}: ${
+                error instanceof Error
+                  ? (LINK_ERROR_EN[error.message] ?? error.message)
+                  : "Invalid format"
+              }`,
         );
       }
     });
@@ -356,7 +398,14 @@ export default function Home() {
         duplicates += 1;
         return;
       }
-      const device = { id: makeId(), name: deviceName, key };
+      const device = {
+        id: makeId(),
+        name:
+          deviceName === "未命名设备"
+            ? tr("未命名设备", "Unnamed device")
+            : deviceName,
+        key,
+      };
       server.devices.push(device);
       added += 1;
     });
@@ -371,8 +420,13 @@ export default function Home() {
       type: "success",
       text:
         duplicates > 0
-          ? `已导入 ${added} 个设备，跳过 ${duplicates} 个重复 Key`
-          : `已导入 ${added} 个设备`,
+          ? tr(
+              `已导入 ${added} 个设备，跳过 ${duplicates} 个重复 Key`,
+              `Imported ${added}; skipped ${duplicates} duplicate ${
+                duplicates === 1 ? "key" : "keys"
+              }`,
+            )
+          : tr(`已导入 ${added} 个设备`, `Imported ${deviceCount(added)}`),
     });
   }
 
@@ -390,7 +444,13 @@ export default function Home() {
       if (!["http:", "https:"].includes(parsed.protocol)) throw new Error();
       if (!name) name = defaultServerName(url);
     } catch {
-      setNotice({ type: "error", text: "请输入完整的服务器地址，例如 https://api.day.app" });
+      setNotice({
+        type: "error",
+        text: tr(
+          "请输入完整的服务器地址，例如 https://api.day.app",
+          "Enter a complete server URL, for example https://api.day.app",
+        ),
+      });
       return;
     }
     const id = makeId();
@@ -401,7 +461,10 @@ export default function Home() {
     }));
     setServerName("");
     setServerUrl("");
-    setNotice({ type: "success", text: `已添加「${name}」` });
+    setNotice({
+      type: "success",
+      text: tr(`已添加「${name}」`, `Added “${name}”`),
+    });
   }
 
   function removeServer(server: BarkServer) {
@@ -415,13 +478,19 @@ export default function Home() {
   }
 
   function saveServerEdit(serverId: string) {
-    const name = serverNameDraft.trim() || "未命名服务器";
+    const name = serverNameDraft.trim() || tr("未命名服务器", "Unnamed server");
     const url = cleanServerUrl(serverUrlDraft);
     try {
       const parsed = new URL(url);
       if (!["http:", "https:"].includes(parsed.protocol)) throw new Error();
     } catch {
-      setNotice({ type: "error", text: "请输入有效的 HTTP 或 HTTPS 服务器地址。" });
+      setNotice({
+        type: "error",
+        text: tr(
+          "请输入有效的 HTTP 或 HTTPS 服务器地址。",
+          "Enter a valid HTTP or HTTPS server URL.",
+        ),
+      });
       return;
     }
     setConfig((current) => ({
@@ -431,7 +500,10 @@ export default function Home() {
       ),
     }));
     setEditingServerId(null);
-    setNotice({ type: "success", text: "服务器信息已更新。" });
+    setNotice({
+      type: "success",
+      text: tr("服务器信息已更新。", "Server details updated."),
+    });
   }
 
   function startEditingDevice(device: Device) {
@@ -441,10 +513,13 @@ export default function Home() {
   }
 
   function saveDeviceEdit(deviceId: string) {
-    const name = deviceNameDraft.trim() || "未命名设备";
+    const name = deviceNameDraft.trim() || tr("未命名设备", "Unnamed device");
     const key = deviceKeyDraft.trim().replace(/^\/+|\/+$/g, "");
     if (!key) {
-      setNotice({ type: "error", text: "Device Key 不能为空。" });
+      setNotice({
+        type: "error",
+        text: tr("Device Key 不能为空。", "Device Key cannot be empty."),
+      });
       return;
     }
     if (
@@ -452,7 +527,13 @@ export default function Home() {
         (device) => device.id !== deviceId && device.key === key,
       )
     ) {
-      setNotice({ type: "error", text: "当前服务器已经存在这个 Device Key。" });
+      setNotice({
+        type: "error",
+        text: tr(
+          "当前服务器已经存在这个 Device Key。",
+          "This Device Key already exists on the current server.",
+        ),
+      });
       return;
     }
     updateActiveServer((server) => ({
@@ -462,7 +543,10 @@ export default function Home() {
       ),
     }));
     setEditingDeviceId(null);
-    setNotice({ type: "success", text: "设备信息已更新。" });
+    setNotice({
+      type: "success",
+      text: tr("设备信息已更新。", "Device details updated."),
+    });
   }
 
   function toggleDevice(id: string) {
@@ -498,7 +582,10 @@ export default function Home() {
         selectedDevices.map(async (device) => {
           const response = await fetch("/api/bark/push", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "Accept-Language": locale,
+            },
             body: JSON.stringify({
               server_url: cleanServerUrl(activeServer.url),
               payload: { ...payloadBase, device_key: device.key },
@@ -520,27 +607,36 @@ export default function Home() {
       const firstFailure =
         failures[0]?.reason instanceof Error
           ? failures[0].reason.message
-          : "未知错误";
+          : tr("未知错误", "Unknown error");
       if (failures.length === 0) {
         setNotice({
           type: "success",
-          text: `已发送给 ${succeeded.length} 个设备`,
+          text: tr(
+            `已发送给 ${succeeded.length} 个设备`,
+            `Sent to ${deviceCount(succeeded.length)}`,
+          ),
         });
       } else if (succeeded.length === 0) {
         setNotice({
           type: "error",
-          text: `发送失败：${firstFailure}`,
+          text: tr(`发送失败：${firstFailure}`, `Send failed: ${firstFailure}`),
         });
       } else {
         setNotice({
           type: "error",
-          text: `${succeeded.length} 个成功，${failures.length} 个失败：${firstFailure}`,
+          text: tr(
+            `${succeeded.length} 个成功，${failures.length} 个失败：${firstFailure}`,
+            `${succeeded.length} succeeded, ${failures.length} failed: ${firstFailure}`,
+          ),
         });
       }
     } catch (error) {
       setNotice({
         type: "error",
-        text: error instanceof Error ? error.message : "发送失败，请稍后重试。",
+        text:
+          error instanceof Error
+            ? error.message
+            : tr("发送失败，请稍后重试。", "Send failed. Try again later."),
       });
     } finally {
       setSending(false);
@@ -550,7 +646,10 @@ export default function Home() {
   function exportConfig() {
     if (
       !window.confirm(
-        "导出的 JSON 包含明文 Device Key。请妥善保管，不要上传到网盘或发给他人。继续导出？",
+        tr(
+          "导出的 JSON 包含明文 Device Key。请妥善保管，不要上传到网盘或发给他人。继续导出？",
+          "The exported JSON contains Device Keys in plain text. Keep it private and do not upload or share it. Continue?",
+        ),
       )
     ) {
       return;
@@ -592,9 +691,15 @@ export default function Home() {
             parsed.servers[0]?.id ??
             "",
         });
-        setNotice({ type: "success", text: "配置已从备份恢复。" });
+        setNotice({
+          type: "success",
+          text: tr("配置已从备份恢复。", "Configuration restored from backup."),
+        });
       } catch {
-        setNotice({ type: "error", text: "备份文件格式不正确。" });
+        setNotice({
+          type: "error",
+          text: tr("备份文件格式不正确。", "The backup file is invalid."),
+        });
       } finally {
         event.target.value = "";
       }
@@ -616,7 +721,10 @@ export default function Home() {
         devices: server.devices.filter((item) => item.id !== device.id),
       }));
       setSelectedDeviceIds((ids) => ids.filter((id) => id !== device.id));
-      setNotice({ type: "success", text: `已移除设备「${device.name}」` });
+      setNotice({
+        type: "success",
+        text: tr(`已移除设备「${device.name}」`, `Removed device “${device.name}”`),
+      });
     }
 
     if (confirmTarget.kind === "server") {
@@ -635,14 +743,20 @@ export default function Home() {
           (id) => !server.devices.some((device) => device.id === id),
         ),
       );
-      setNotice({ type: "success", text: `已删除服务器「${server.name}」` });
+      setNotice({
+        type: "success",
+        text: tr(`已删除服务器「${server.name}」`, `Deleted server “${server.name}”`),
+      });
     }
 
     if (confirmTarget.kind === "clear") {
       setConfig(DEFAULT_CONFIG);
       setSelectedDeviceIds([]);
       localStorage.removeItem(STORAGE_KEY);
-      setNotice({ type: "success", text: "本地配置已清除。" });
+      setNotice({
+        type: "success",
+        text: tr("本地配置已清除。", "Local configuration cleared."),
+      });
     }
 
     setConfirmTarget(null);
@@ -652,7 +766,7 @@ export default function Home() {
     return (
       <main className="boot">
         <div className="boot-mark">B</div>
-        <p>正在读取本地配置…</p>
+        <p>{tr("正在读取本地配置…", "Loading local configuration…")}</p>
       </main>
     );
   }
@@ -664,24 +778,32 @@ export default function Home() {
           <span className="brand-mark">B</span>
           <div>
             <strong>Bark Console</strong>
-            <span>把通知送到你的设备</span>
+            <span>{tr("把通知送到你的设备", "Send notifications to your devices")}</span>
           </div>
         </div>
         <div className="header-actions">
           <span className="privacy-pill">
             <span className="privacy-dot" />
-            数据仅在此浏览器
+            {tr("数据仅在此浏览器", "Data stays in this browser")}
           </span>
+          <button
+            className="language-toggle"
+            type="button"
+            onClick={() => setLocale((current) => (current === "zh" ? "en" : "zh"))}
+            aria-label={tr("切换到英语", "Switch to Chinese")}
+          >
+            {locale === "zh" ? "EN" : "中文"}
+          </button>
           <button
             className="header-add-button"
             onClick={() => setShowImport(true)}
           >
             <span aria-hidden="true">＋</span>
-            <span>添加 Bark 地址</span>
+            <span>{tr("添加 Bark 地址", "Add Bark link")}</span>
           </button>
           <button className="icon-button" onClick={() => setShowSettings(true)}>
             <span aria-hidden="true">⚙</span>
-            <span>设置</span>
+            <span>{tr("设置", "Settings")}</span>
           </button>
         </div>
       </header>
@@ -690,15 +812,25 @@ export default function Home() {
         <div className="local-warning" role="note">
           <span className="warning-icon">!</span>
           <div>
-            <strong>Device Key 只保存在当前浏览器，容易丢失</strong>
-            <p>清理浏览器数据、使用无痕模式或更换设备后都无法恢复。建议添加完成后立即导出备份。</p>
+            <strong>
+              {tr(
+                "Device Key 只保存在当前浏览器，容易丢失",
+                "Device Keys exist only in this browser and are easy to lose",
+              )}
+            </strong>
+            <p>
+              {tr(
+                "清理浏览器数据、使用无痕模式或更换设备后都无法恢复。建议添加完成后立即导出备份。",
+                "They cannot be recovered after clearing browser data, using private browsing, or changing devices. Export a backup after setup.",
+              )}
+            </p>
           </div>
           <button className="warning-export" onClick={exportConfig}>
-            导出备份
+            {tr("导出备份", "Export backup")}
           </button>
           <button
             className="warning-close"
-            aria-label="关闭备份提醒"
+            aria-label={tr("关闭备份提醒", "Dismiss backup reminder")}
             onClick={() => {
               setBackupWarningDismissed(true);
               localStorage.setItem(BACKUP_WARNING_KEY, "1");
@@ -713,7 +845,7 @@ export default function Home() {
         <aside className="device-panel">
           <div className="panel-heading">
             <div className="server-select" ref={serverMenuRef}>
-              <span className="eyebrow">当前服务器</span>
+              <span className="eyebrow">{tr("当前服务器", "Current server")}</span>
               <button
                 className="server-select-trigger"
                 type="button"
@@ -725,7 +857,7 @@ export default function Home() {
                     : setShowImport(true)
                 }
               >
-                <span>{activeServer?.name ?? "尚未添加服务器"}</span>
+                <span>{activeServer?.name ?? tr("尚未添加服务器", "No server added")}</span>
                 {config.servers.length > 0 && (
                   <span className={`select-chevron ${serverMenuOpen ? "open" : ""}`} />
                 )}
@@ -734,7 +866,7 @@ export default function Home() {
                 <div
                   className="server-select-menu"
                   role="listbox"
-                  aria-label="选择 Bark 服务器"
+                  aria-label={tr("选择 Bark 服务器", "Choose a Bark server")}
                 >
                   {config.servers.map((server) => {
                     const selected = server.id === activeServer?.id;
@@ -758,7 +890,7 @@ export default function Home() {
                         </span>
                         <span className="server-option-copy">
                           <strong>{server.name}</strong>
-                          <small>{server.devices.length} 个设备</small>
+                          <small>{deviceCount(server.devices.length)}</small>
                         </span>
                         <span className="server-option-check">
                           {selected ? "✓" : ""}
@@ -775,7 +907,7 @@ export default function Home() {
                     }}
                   >
                     <span>⚙</span>
-                    管理服务器与设备
+                    {tr("管理服务器与设备", "Manage servers and devices")}
                   </button>
                 </div>
               )}
@@ -783,19 +915,23 @@ export default function Home() {
             <button
               className="small-ghost"
               onClick={() => setShowSettings(true)}
-              aria-label="管理服务器"
+              aria-label={tr("管理服务器", "Manage servers")}
             >
-              编辑
+              {tr("编辑", "Edit")}
             </button>
           </div>
           <div className="server-address">
-            {activeServer?.url ?? "粘贴 Bark 推送链接即可自动添加"}
+            {activeServer?.url ??
+              tr(
+                "粘贴 Bark 推送链接即可自动添加",
+                "Paste a Bark push link to add it automatically",
+              )}
           </div>
 
           <div className="devices-title">
             <div>
-              <h2>接收设备</h2>
-              <span>{activeServer?.devices.length ?? 0} 个设备</span>
+              <h2>{tr("接收设备", "Devices")}</h2>
+              <span>{deviceCount(activeServer?.devices.length ?? 0)}</span>
             </div>
             {activeServer && activeServer.devices.length > 0 && (
               <button
@@ -809,8 +945,8 @@ export default function Home() {
                 }
               >
                 {selectedDeviceIds.length === activeServer.devices.length
-                  ? "取消全选"
-                  : "全选"}
+                  ? tr("取消全选", "Deselect all")
+                  : tr("全选", "Select all")}
               </button>
             )}
           </div>
@@ -839,11 +975,21 @@ export default function Home() {
             ) : (
               <div className="empty-state">
                 <span className="empty-phone">↗</span>
-                <strong>{activeServer ? "还没有接收设备" : "从 Bark 链接开始"}</strong>
+                <strong>
+                  {activeServer
+                    ? tr("还没有接收设备", "No devices yet")
+                    : tr("从 Bark 链接开始", "Start with a Bark link")}
+                </strong>
                 <p>
                   {activeServer
-                    ? "点击右上角“添加 Bark 地址”，导入新的设备链接。"
-                    : "点击右上角“添加 Bark 地址”，服务器和设备会自动创建。"}
+                    ? tr(
+                        "点击右上角“添加 Bark 地址”，导入新的设备链接。",
+                        "Use “Add Bark link” above to import a device link.",
+                      )
+                    : tr(
+                        "点击右上角“添加 Bark 地址”，服务器和设备会自动创建。",
+                        "Use “Add Bark link” above to create the server and device automatically.",
+                      )}
                 </p>
               </div>
             )}
@@ -853,60 +999,73 @@ export default function Home() {
         <section className="composer-panel">
           <div className="composer-heading">
             <div>
-              <span className="eyebrow">新通知</span>
-              <h1>发送一条 Bark 通知</h1>
+              <span className="eyebrow">{tr("新通知", "New notification")}</span>
+              <h1>{tr("发送一条 Bark 通知", "Send a Bark notification")}</h1>
               <p>
                 {selectedDevices.length
-                  ? `将发送给：${selectedDevices.map((device) => device.name).join("、")}`
-                  : "请先从左侧选择一个或多个接收设备"}
+                  ? tr(
+                      `将发送给：${selectedDevices.map((device) => device.name).join("、")}`,
+                      `Sending to: ${selectedDevices.map((device) => device.name).join(", ")}`,
+                    )
+                  : tr(
+                      "请先从左侧选择一个或多个接收设备",
+                      "Choose one or more devices from the left",
+                    )}
               </p>
             </div>
             <span className={`status-badge ${selectedDevices.length ? "ready" : ""}`}>
-              {selectedDevices.length ? `${selectedDevices.length} 个设备` : "未选择设备"}
+              {selectedDevices.length
+                ? deviceCount(selectedDevices.length)
+                : tr("未选择设备", "No device selected")}
             </span>
           </div>
 
           <form className="composer-form" onSubmit={sendPush}>
             <div className="field-row">
               <label className="field">
-                <span>通知标题 <em>可选</em></span>
+                <span>{tr("通知标题", "Title")} <em>{tr("可选", "Optional")}</em></span>
                 <input
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
-                  placeholder="例如：今日提醒"
+                  placeholder={tr("例如：今日提醒", "For example: Today’s reminder")}
                 />
               </label>
               <label className="field">
-                <span>副标题 <em>可选</em></span>
+                <span>{tr("副标题", "Subtitle")} <em>{tr("可选", "Optional")}</em></span>
                 <input
                   value={subtitle}
                   onChange={(event) => setSubtitle(event.target.value)}
-                  placeholder="显示在标题与正文之间"
+                  placeholder={tr("显示在标题与正文之间", "Shown between the title and message")}
                 />
               </label>
             </div>
 
             <div className="field-row compact-row">
               <label className="field">
-                <span>通知分组 <em>可选</em></span>
+                <span>{tr("通知分组", "Group")} <em>{tr("可选", "Optional")}</em></span>
                 <input
                   value={group}
                   onChange={(event) => setGroup(event.target.value)}
-                  placeholder="例如：日常通知"
+                  placeholder={tr("例如：日常通知", "For example: Daily")}
                 />
               </label>
               <div className="field format-field">
                 <span>
-                  内容格式 <em>支持基础 Markdown</em>
+                  {tr("内容格式", "Message format")}{" "}
+                  <em>{tr("支持基础 Markdown", "Basic Markdown supported")}</em>
                 </span>
-                <div className="format-picker" role="group" aria-label="通知内容格式">
+                <div
+                  className="format-picker"
+                  role="group"
+                  aria-label={tr("通知内容格式", "Notification message format")}
+                >
                   <button
                     type="button"
                     className={!useMarkdown ? "active" : ""}
                     onClick={() => setUseMarkdown(false)}
                     aria-pressed={!useMarkdown}
                   >
-                    纯文本
+                    {tr("纯文本", "Plain text")}
                   </button>
                   <button
                     type="button"
@@ -921,14 +1080,19 @@ export default function Home() {
             </div>
 
             <label className="field message-field">
-              <span>{useMarkdown ? "Markdown 内容" : "通知内容"}</span>
+              <span>
+                {useMarkdown ? tr("Markdown 内容", "Markdown message") : tr("通知内容", "Message")}
+              </span>
               <textarea
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
                 placeholder={
                   useMarkdown
-                    ? "例如：**今日计划**\n\n- 领取快递\n- 晚上七点散步"
-                    : "写下你想发送的内容…"
+                    ? tr(
+                        "例如：**今日计划**\n\n- 领取快递\n- 晚上七点散步",
+                        "For example: **Today’s plan**\n\n- Pick up a package\n- Take an evening walk",
+                      )
+                    : tr("写下你想发送的内容…", "Write your notification…")
                 }
                 maxLength={1000}
                 required
@@ -938,32 +1102,32 @@ export default function Home() {
 
             <div className="field-row">
               <label className="field">
-                <span>提醒级别</span>
+                <span>{tr("提醒级别", "Interruption level")}</span>
                 <SelectMenu
-                  label="提醒级别"
+                  label={tr("提醒级别", "Interruption level")}
                   value={level}
                   onChange={setLevel}
-                  options={LEVELS.map(([value, label, description]) => ({
+                  options={LEVELS.map(([value, enLabel, zhLabel, enDescription, zhDescription]) => ({
                     value,
-                    label,
-                    description,
+                    label: tr(zhLabel, enLabel),
+                    description: tr(zhDescription, enDescription),
                   }))}
                 />
               </label>
               <label className="field">
-                <span>通知铃声</span>
+                <span>{tr("通知铃声", "Sound")}</span>
                 <SelectMenu
-                  label="通知铃声"
+                  label={tr("通知铃声", "Sound")}
                   value={sound}
                   onChange={setSound}
-                  options={SOUNDS.map(([value, label]) => ({
+                  options={SOUNDS.map(([value, enLabel, zhLabel]) => ({
                     value,
-                    label,
+                    label: tr(zhLabel, enLabel),
                     description: value
                       ? value === "silence"
-                        ? "不播放提示音"
-                        : `系统铃声 · ${value}`
-                      : "使用 Bark 默认设置",
+                        ? tr("不播放提示音", "No notification sound")
+                        : tr(`系统铃声 · ${value}`, `System sound · ${value}`)
+                      : tr("使用 Bark 默认设置", "Use the Bark default"),
                   }))}
                 />
               </label>
@@ -972,8 +1136,13 @@ export default function Home() {
             {level === "critical" && (
               <label className="volume-field">
                 <span>
-                  <strong>重要警告音量</strong>
-                  <small>即使设备处于静音模式也会响铃</small>
+                  <strong>{tr("重要警告音量", "Critical alert volume")}</strong>
+                  <small>
+                    {tr(
+                      "即使设备处于静音模式也会响铃",
+                      "Can play even when the device is in Silent mode",
+                    )}
+                  </small>
                 </span>
                 <input
                   type="range"
@@ -982,7 +1151,7 @@ export default function Home() {
                   step="1"
                   value={volume}
                   onChange={(event) => setVolume(event.target.value)}
-                  aria-label="重要警告音量"
+                  aria-label={tr("重要警告音量", "Critical alert volume")}
                 />
                 <output>{volume} / 10</output>
               </label>
@@ -994,24 +1163,24 @@ export default function Home() {
               onClick={() => setShowAdvanced((value) => !value)}
               aria-expanded={showAdvanced}
             >
-              <span>高级选项</span>
+              <span>{tr("高级选项", "Advanced options")}</span>
               <span>{showAdvanced ? "−" : "＋"}</span>
             </button>
 
             {showAdvanced && (
               <div className="advanced-grid">
                 <label className="field">
-                  <span>角标数字</span>
+                  <span>{tr("角标数字", "Badge number")}</span>
                   <input
                     value={badge}
                     onChange={(event) => setBadge(event.target.value)}
                     type="number"
                     min="0"
-                    placeholder="例如：1"
+                    placeholder={tr("例如：1", "For example: 1")}
                   />
                 </label>
                 <label className="field">
-                  <span>图标 URL</span>
+                  <span>{tr("图标 URL", "Icon URL")}</span>
                   <input
                     value={icon}
                     onChange={(event) => setIcon(event.target.value)}
@@ -1020,19 +1189,19 @@ export default function Home() {
                   />
                 </label>
                 <label className="field">
-                  <span>点击跳转 URL</span>
+                  <span>{tr("点击跳转 URL", "Open URL")}</span>
                   <input
                     value={jumpUrl}
                     onChange={(event) => setJumpUrl(event.target.value)}
-                    placeholder="https://… 或自定义 Scheme"
+                    placeholder={tr("https://… 或自定义 Scheme", "https://… or a custom scheme")}
                   />
                 </label>
                 <label className="field">
-                  <span>复制内容</span>
+                  <span>{tr("复制内容", "Copy text")}</span>
                   <input
                     value={copy}
                     onChange={(event) => setCopy(event.target.value)}
-                    placeholder="长按通知时复制"
+                    placeholder={tr("长按通知时复制", "Copied when the notification is held")}
                   />
                 </label>
                 <label className="switch-row">
@@ -1041,7 +1210,7 @@ export default function Home() {
                     checked={autoCopy}
                     onChange={(event) => setAutoCopy(event.target.checked)}
                   />
-                  <span>收到通知时自动复制</span>
+                  <span>{tr("收到通知时自动复制", "Copy automatically on receipt")}</span>
                 </label>
                 <label className="switch-row">
                   <input
@@ -1049,19 +1218,26 @@ export default function Home() {
                     checked={isArchive}
                     onChange={(event) => setIsArchive(event.target.checked)}
                   />
-                  <span>保存到 Bark 历史记录</span>
+                  <span>{tr("保存到 Bark 历史记录", "Save to Bark history")}</span>
                 </label>
               </div>
             )}
 
             <div className="send-row">
-              <p>通知内容将直接发送到当前 Bark 服务器。</p>
+              <p>
+                {tr(
+                  "通知内容将直接发送到当前 Bark 服务器。",
+                  "The notification is sent directly to the current Bark server.",
+                )}
+              </p>
               <button
                 className="primary-button"
                 type="submit"
                 disabled={sending || !body.trim() || selectedDevices.length === 0}
               >
-                <span>{sending ? "发送中…" : "发送通知"}</span>
+                <span>
+                  {sending ? tr("发送中…", "Sending…") : tr("发送通知", "Send notification")}
+                </span>
                 <span aria-hidden="true">↗</span>
               </button>
             </div>
@@ -1083,25 +1259,28 @@ export default function Home() {
           >
             <div className="modal-heading">
               <div>
-                <span className="eyebrow">快速导入</span>
-                <h2 id="import-title">添加 Bark 地址</h2>
+                <span className="eyebrow">{tr("快速导入", "Quick import")}</span>
+                <h2 id="import-title">{tr("添加 Bark 地址", "Add Bark link")}</h2>
               </div>
               <button
                 className="close-button"
                 onClick={() => setShowImport(false)}
-                aria-label="关闭添加窗口"
+                aria-label={tr("关闭添加窗口", "Close add dialog")}
               >
                 ×
               </button>
             </div>
             <form className="import-modal-form" onSubmit={importBarkLinks}>
               <label>
-                <span>完整 Bark 推送链接</span>
+                <span>{tr("完整 Bark 推送链接", "Complete Bark push link")}</span>
                 <textarea
                   value={barkLinks}
                   onChange={(event) => setBarkLinks(event.target.value)}
                   placeholder={
-                    "我的手机 https://bark.example.com/DemoDeviceKey_123456/推送内容\n平板 https://api.day.app/AnotherDemoKey_789/推送内容"
+                    tr(
+                      "我的手机 https://bark.example.com/DemoDeviceKey_123456/推送内容\n平板 https://api.day.app/AnotherDemoKey_789/推送内容",
+                      "My phone https://bark.example.com/DemoDeviceKey_123456/message\nTablet https://api.day.app/AnotherDemoKey_789/message",
+                    )
                   }
                   autoComplete="off"
                   autoFocus
@@ -1109,10 +1288,14 @@ export default function Home() {
                 />
               </label>
               <div className="import-example">
-                <strong>支持设备名称与多行导入</strong>
+                <strong>
+                  {tr("支持设备名称与多行导入", "Device names and multi-line import supported")}
+                </strong>
                 <p>
-                  每行使用“设备名 + 一个半角空格 + 完整链接”。格式不规范时整批拒绝写入，
-                  链接中的推送内容不会保存。
+                  {tr(
+                    "每行使用“设备名 + 一个半角空格 + 完整链接”。格式不规范时整批拒绝写入，链接中的推送内容不会保存。",
+                    "Use “device name + one regular space + complete link” on each line. If any line is invalid, nothing is imported. Message text in links is not saved.",
+                  )}
                 </p>
               </div>
               <div className="import-actions">
@@ -1121,10 +1304,12 @@ export default function Home() {
                   className="secondary-button"
                   onClick={() => setShowImport(false)}
                 >
-                  取消
+                  {tr("取消", "Cancel")}
                 </button>
                 <button type="submit" className="save-button">
-                  {barkLinks.includes("\n") ? "批量导入" : "解析并添加"}
+                  {barkLinks.includes("\n")
+                    ? tr("批量导入", "Import all")
+                    : tr("解析并添加", "Parse and add")}
                 </button>
               </div>
             </form>
@@ -1143,34 +1328,34 @@ export default function Home() {
           >
             <div className="modal-heading">
               <div>
-                <span className="eyebrow">本地配置</span>
-                <h2 id="settings-title">服务器与设备</h2>
+                <span className="eyebrow">{tr("本地配置", "Local configuration")}</span>
+                <h2 id="settings-title">{tr("服务器与设备", "Servers and devices")}</h2>
               </div>
               <button
                 className="close-button"
                 onClick={() => setShowSettings(false)}
-                aria-label="关闭设置"
+                aria-label={tr("关闭设置", "Close settings")}
               >
                 ×
               </button>
             </div>
 
             <div className="settings-section">
-              <h3>服务器</h3>
+              <h3>{tr("服务器", "Servers")}</h3>
               <div className="server-list">
                 {config.servers.map((server) =>
                   editingServerId === server.id ? (
                     <div className="edit-card" key={server.id}>
                       <label>
-                        <span>服务器名称</span>
+                        <span>{tr("服务器名称", "Server name")}</span>
                         <input
                           value={serverNameDraft}
                           onChange={(event) => setServerNameDraft(event.target.value)}
-                          placeholder="未命名服务器"
+                          placeholder={tr("未命名服务器", "Unnamed server")}
                         />
                       </label>
                       <label>
-                        <span>服务器地址</span>
+                        <span>{tr("服务器地址", "Server URL")}</span>
                         <input
                           value={serverUrlDraft}
                           onChange={(event) => setServerUrlDraft(event.target.value)}
@@ -1182,13 +1367,13 @@ export default function Home() {
                           className="secondary-button"
                           onClick={() => setEditingServerId(null)}
                         >
-                          取消
+                          {tr("取消", "Cancel")}
                         </button>
                         <button
                           className="save-button"
                           onClick={() => saveServerEdit(server.id)}
                         >
-                          保存
+                          {tr("保存", "Save")}
                         </button>
                       </div>
                     </div>
@@ -1207,36 +1392,39 @@ export default function Home() {
                             activeServerId: server.id,
                           }))
                         }
-                        aria-label={`切换到 ${server.name}`}
+                        aria-label={tr(`切换到 ${server.name}`, `Switch to ${server.name}`)}
                       >
                         {server.name.slice(0, 1)}
                       </button>
                       <div>
                         <strong>{server.name}</strong>
                         <span>
-                          {server.url} · {server.devices.length} 个设备
+                          {server.url} · {deviceCount(server.devices.length)}
                         </span>
                       </div>
                       <button
                         className="edit-text"
                         onClick={() => startEditingServer(server)}
                       >
-                        编辑
+                        {tr("编辑", "Edit")}
                       </button>
                       <button
                         className="danger-text"
                         onClick={() => removeServer(server)}
                       >
-                        删除
+                        {tr("删除", "Delete")}
                       </button>
                     </div>
                   ),
                 )}
                 {config.servers.length === 0 && (
                   <div className="settings-empty">
-                    <strong>还没有服务器</strong>
+                    <strong>{tr("还没有服务器", "No servers yet")}</strong>
                     <span>
-                      点击按钮粘贴完整 Bark 链接，或使用下方表单手动添加服务器。
+                      {tr(
+                        "点击按钮粘贴完整 Bark 链接，或使用下方表单手动添加服务器。",
+                        "Paste a complete Bark link, or add a server manually below.",
+                      )}
                     </span>
                     <button
                       className="settings-add-link"
@@ -1246,7 +1434,7 @@ export default function Home() {
                       }}
                     >
                       <span aria-hidden="true">＋</span>
-                      添加 Bark 地址
+                      {tr("添加 Bark 地址", "Add Bark link")}
                     </button>
                   </div>
                 )}
@@ -1255,7 +1443,7 @@ export default function Home() {
                 <input
                   value={serverName}
                   onChange={(event) => setServerName(event.target.value)}
-                  placeholder="名称（可选）"
+                  placeholder={tr("名称（可选）", "Name (optional)")}
                 />
                 <input
                   value={serverUrl}
@@ -1264,28 +1452,31 @@ export default function Home() {
                   type="url"
                   required
                 />
-                <button type="submit">添加服务器</button>
+                <button type="submit">{tr("添加服务器", "Add server")}</button>
               </form>
               <p className="settings-help">
-                Device Key 属于服务器实例。更换服务器后，请在 Bark App 中重新注册并添加新 Key。
+                {tr(
+                  "Device Key 属于服务器实例。更换服务器后，请在 Bark App 中重新注册并添加新 Key。",
+                  "A Device Key belongs to one server instance. After changing servers, register again in the Bark app and add the new key.",
+                )}
               </p>
             </div>
 
             <div className="settings-section">
               <div className="section-title-row">
-                <h3>当前服务器的设备</h3>
-                <span>{activeServer?.name ?? "尚未选择服务器"}</span>
+                <h3>{tr("当前服务器的设备", "Devices on current server")}</h3>
+                <span>{activeServer?.name ?? tr("尚未选择服务器", "No server selected")}</span>
               </div>
               <div className="manage-device-list">
                 {activeServer?.devices.map((device) =>
                   editingDeviceId === device.id ? (
                     <div className="edit-card device-edit-card" key={device.id}>
                       <label>
-                        <span>设备名称</span>
+                        <span>{tr("设备名称", "Device name")}</span>
                         <input
                           value={deviceNameDraft}
                           onChange={(event) => setDeviceNameDraft(event.target.value)}
-                          placeholder="未命名设备"
+                          placeholder={tr("未命名设备", "Unnamed device")}
                         />
                       </label>
                       <label>
@@ -1301,13 +1492,13 @@ export default function Home() {
                           className="secondary-button"
                           onClick={() => setEditingDeviceId(null)}
                         >
-                          取消
+                          {tr("取消", "Cancel")}
                         </button>
                         <button
                           className="save-button"
                           onClick={() => saveDeviceEdit(device.id)}
                         >
-                          保存
+                          {tr("保存", "Save")}
                         </button>
                       </div>
                     </div>
@@ -1328,22 +1519,24 @@ export default function Home() {
                           }))
                         }
                       >
-                        {showKeys[device.id] ? "隐藏" : "显示"}
+                        {showKeys[device.id] ? tr("隐藏", "Hide") : tr("显示", "Show")}
                       </button>
                       <button
                         className="edit-text"
                         onClick={() => startEditingDevice(device)}
                       >
-                        编辑
+                        {tr("编辑", "Edit")}
                       </button>
                       <button className="danger-text" onClick={() => removeDevice(device)}>
-                        移除
+                        {tr("移除", "Remove")}
                       </button>
                     </div>
                   ),
                 )}
                 {!activeServer?.devices.length && (
-                  <p className="settings-help">当前服务器还没有保存设备。</p>
+                  <p className="settings-help">
+                    {tr("当前服务器还没有保存设备。", "No devices are saved on this server.")}
+                  </p>
                 )}
               </div>
             </div>
@@ -1357,16 +1550,16 @@ export default function Home() {
                 hidden
               />
               <button className="secondary-button" onClick={exportConfig}>
-                导出备份
+                {tr("导出备份", "Export backup")}
               </button>
               <button
                 className="secondary-button"
                 onClick={() => fileInputRef.current?.click()}
               >
-                导入备份
+                {tr("导入备份", "Import backup")}
               </button>
               <button className="danger-button" onClick={clearAllData}>
-                清除全部本地数据
+                {tr("清除全部本地数据", "Clear all local data")}
               </button>
             </div>
           </section>
@@ -1390,31 +1583,52 @@ export default function Home() {
               !
             </span>
             <div className="confirm-copy">
-              <span className="eyebrow">危险操作</span>
+              <span className="eyebrow">{tr("危险操作", "Destructive action")}</span>
               <h2 id="confirm-title">
-                {confirmTarget.kind === "device" && "移除这个设备？"}
-                {confirmTarget.kind === "server" && "删除这个服务器？"}
-                {confirmTarget.kind === "clear" && "清除全部本地数据？"}
+                {confirmTarget.kind === "device" &&
+                  tr("移除这个设备？", "Remove this device?")}
+                {confirmTarget.kind === "server" &&
+                  tr("删除这个服务器？", "Delete this server?")}
+                {confirmTarget.kind === "clear" &&
+                  tr("清除全部本地数据？", "Clear all local data?")}
               </h2>
               <p id="confirm-description">
                 {confirmTarget.kind === "device" &&
-                  `设备“${confirmTarget.device.name}”的 Device Key 将从此浏览器移除。`}
+                  tr(
+                    `设备“${confirmTarget.device.name}”的 Device Key 将从此浏览器移除。`,
+                    `The Device Key for “${confirmTarget.device.name}” will be removed from this browser.`,
+                  )}
                 {confirmTarget.kind === "server" &&
-                  `服务器“${confirmTarget.server.name}”及其 ${confirmTarget.server.devices.length} 个设备配置将被删除。`}
+                  tr(
+                    `服务器“${confirmTarget.server.name}”及其 ${confirmTarget.server.devices.length} 个设备配置将被删除。`,
+                    `“${confirmTarget.server.name}” and its ${deviceCount(
+                      confirmTarget.server.devices.length,
+                    )} will be deleted.`,
+                  )}
                 {confirmTarget.kind === "clear" &&
-                  "所有服务器、设备名称和 Device Key 都将从此浏览器删除。"}
+                  tr(
+                    "所有服务器、设备名称和 Device Key 都将从此浏览器删除。",
+                    "All servers, device names, and Device Keys will be deleted from this browser.",
+                  )}
               </p>
-              <small>此操作无法撤销，请确认已按需导出备份。</small>
+              <small>
+                {tr(
+                  "此操作无法撤销，请确认已按需导出备份。",
+                  "This cannot be undone. Export a backup first if needed.",
+                )}
+              </small>
             </div>
             <div className="confirm-actions">
               <button
                 className="secondary-button"
                 onClick={() => setConfirmTarget(null)}
               >
-                取消
+                {tr("取消", "Cancel")}
               </button>
               <button className="confirm-danger-button" onClick={executeConfirmedAction}>
-                {confirmTarget.kind === "device" ? "确认移除" : "确认删除"}
+                {confirmTarget.kind === "device"
+                  ? tr("确认移除", "Remove")
+                  : tr("确认删除", "Delete")}
               </button>
             </div>
           </section>
