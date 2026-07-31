@@ -1136,6 +1136,11 @@ textarea:focus {
   border-top: 1px solid var(--line);
 }
 
+.advanced-toggle + .send-row {
+  padding-top: 0;
+  border-top: 0;
+}
+
 .send-row p {
   margin: 0;
   color: var(--soft);
