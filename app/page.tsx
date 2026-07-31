@@ -372,10 +372,13 @@ export default function Home() {
     try {
       const results = await Promise.allSettled(
         selectedDevices.map(async (device) => {
-          const response = await fetch(`${cleanServerUrl(activeServer.url)}/push`, {
+          const response = await fetch("/api/bark/push", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...payloadBase, device_key: device.key }),
+            body: JSON.stringify({
+              server_url: cleanServerUrl(activeServer.url),
+              payload: { ...payloadBase, device_key: device.key },
+            }),
           });
           const result = (await response.json().catch(() => null)) as
             | { code?: number; message?: string }
