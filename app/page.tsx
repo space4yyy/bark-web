@@ -546,17 +546,29 @@ export default function Home() {
                   placeholder="例如：运维告警"
                 />
               </label>
-              <label className="switch-row markdown-switch">
-                <input
-                  type="checkbox"
-                  checked={useMarkdown}
-                  onChange={(event) => setUseMarkdown(event.target.checked)}
-                />
+              <div className="field format-field">
                 <span>
-                  <strong>使用 Markdown</strong>
-                  <small>支持标题、列表、链接与代码等基础格式</small>
+                  内容格式 <em>支持基础 Markdown</em>
                 </span>
-              </label>
+                <div className="format-picker" role="group" aria-label="通知内容格式">
+                  <button
+                    type="button"
+                    className={!useMarkdown ? "active" : ""}
+                    onClick={() => setUseMarkdown(false)}
+                    aria-pressed={!useMarkdown}
+                  >
+                    纯文本
+                  </button>
+                  <button
+                    type="button"
+                    className={useMarkdown ? "active" : ""}
+                    onClick={() => setUseMarkdown(true)}
+                    aria-pressed={useMarkdown}
+                  >
+                    Markdown
+                  </button>
+                </div>
+              </div>
             </div>
 
             <label className="field message-field">
