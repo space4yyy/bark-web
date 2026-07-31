@@ -60,6 +60,7 @@ select {
 
 .boot {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-content: center;
   text-align: center;
@@ -87,6 +88,7 @@ select {
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   padding-bottom: 48px;
 }
 
@@ -1317,6 +1319,7 @@ textarea:focus {
 .settings-modal {
   width: min(760px, 100%);
   max-height: min(820px, calc(100vh - 60px));
+  max-height: min(820px, calc(100dvh - 60px));
   overflow-y: auto;
   border-radius: 17px;
   background: white;
@@ -1860,8 +1863,8 @@ textarea:focus {
   }
 
   .topbar {
-    height: 76px;
-    padding: 0 16px;
+    height: calc(76px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 16px 0;
   }
 
   .privacy-pill,
@@ -1943,7 +1946,7 @@ textarea:focus {
   .mobile-recipient-bar {
     position: sticky;
     z-index: 12;
-    top: 0;
+    top: env(safe-area-inset-top);
     width: calc(100% + 40px);
     min-height: 66px;
     margin: 0 -20px;
@@ -2149,6 +2152,7 @@ textarea:focus {
   .mobile-device-sheet {
     width: 100%;
     max-height: min(86vh, 760px);
+    max-height: min(86dvh, 760px);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -2306,6 +2310,7 @@ textarea:focus {
 
   .settings-modal {
     max-height: 92vh;
+    max-height: 92dvh;
     border-radius: 18px 18px 0 0;
   }
 

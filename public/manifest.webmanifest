@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "Bark Console",
+  "short_name": "Bark",
+  "description": "在浏览器中管理 Bark 服务器与设备，并快速发送通知。",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f5f1",
+  "theme_color": "#1c6b48",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
