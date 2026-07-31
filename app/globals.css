@@ -623,7 +623,6 @@ textarea {
 
 .add-device input,
 .field input,
-.field select,
 .inline-form input {
   height: 40px;
   padding: 0 12px;
@@ -632,6 +631,120 @@ textarea {
   background: white;
   font-size: 12px;
   transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+.select-menu-field {
+  position: relative;
+}
+
+.select-menu-trigger {
+  width: 100%;
+  min-height: 46px;
+  padding: 7px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: white;
+  text-align: left;
+  transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+}
+
+.select-menu-trigger:hover {
+  background: #fbfcfa;
+}
+
+.select-menu-trigger[aria-expanded="true"] {
+  border-color: #75a98b;
+  box-shadow: 0 0 0 3px rgba(36, 115, 78, 0.1);
+}
+
+.select-menu-trigger > span:first-child,
+.select-option-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.select-menu-trigger strong,
+.select-option-copy strong {
+  overflow: hidden;
+  color: #334038;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-menu-trigger small,
+.select-option-copy small {
+  overflow: hidden;
+  color: var(--soft);
+  font-size: 9px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-menu-popover {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 7px);
+  left: 0;
+  width: 100%;
+  max-height: 292px;
+  padding: 6px;
+  overflow-y: auto;
+  display: grid;
+  gap: 3px;
+  border: 1px solid #d4ddd5;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 16px 42px rgba(25, 42, 31, 0.16);
+  backdrop-filter: blur(12px);
+  animation: menu-in 0.14s ease-out;
+}
+
+.select-menu-popover > button {
+  width: 100%;
+  min-width: 0;
+  padding: 9px;
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+}
+
+.select-menu-popover > button:hover {
+  background: #f2f5f1;
+}
+
+.select-menu-popover > button.selected {
+  background: var(--green-pale);
+}
+
+.select-option-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #cbd2cc;
+}
+
+.selected .select-option-dot {
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(28, 107, 72, 0.1);
+}
+
+.select-option-check {
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 900;
+  text-align: center;
 }
 
 input:focus,

@@ -62,6 +62,97 @@ const SOUNDS = [
   ["silence", "静音"],
 ];
 
+const LEVELS = [
+  ["active", "主动提醒", "立即亮屏并显示通知"],
+  ["timeSensitive", "时效性通知", "可在专注模式下显示"],
+  ["passive", "静默通知", "仅加入通知中心"],
+  ["critical", "重要警告", "静音模式下仍可响铃"],
+];
+
+type SelectMenuOption = {
+  value: string;
+  label: string;
+  description?: string;
+};
+
+function SelectMenu({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: SelectMenuOption[];
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selected = options.find((option) => option.value === value) ?? options[0];
+
+  useEffect(() => {
+    function close(event: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function closeWithKeyboard(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", closeWithKeyboard);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", closeWithKeyboard);
+    };
+  }, []);
+
+  return (
+    <div className="select-menu-field" ref={rootRef}>
+      <button
+        type="button"
+        className="select-menu-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span>
+          <strong>{selected.label}</strong>
+          {selected.description && <small>{selected.description}</small>}
+        </span>
+        <span className={`select-chevron ${open ? "open" : ""}`} />
+      </button>
+      {open && (
+        <div className="select-menu-popover" role="listbox" aria-label={label}>
+          {options.map((option) => {
+            const isSelected = option.value === value;
+            return (
+              <button
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                className={isSelected ? "selected" : ""}
+                key={option.value || "default"}
+                onClick={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+              >
+                <span className="select-option-dot" />
+                <span className="select-option-copy">
+                  <strong>{option.label}</strong>
+                  {option.description && <small>{option.description}</small>}
+                </span>
+                <span className="select-option-check">{isSelected ? "✓" : ""}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function makeId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -657,22 +748,33 @@ export default function Home() {
             <div className="field-row">
               <label className="field">
                 <span>提醒级别</span>
-                <select value={level} onChange={(event) => setLevel(event.target.value)}>
-                  <option value="active">主动提醒</option>
-                  <option value="timeSensitive">时效性通知</option>
-                  <option value="passive">静默通知</option>
-                  <option value="critical">重要警告</option>
-                </select>
+                <SelectMenu
+                  label="提醒级别"
+                  value={level}
+                  onChange={setLevel}
+                  options={LEVELS.map(([value, label, description]) => ({
+                    value,
+                    label,
+                    description,
+                  }))}
+                />
               </label>
               <label className="field">
                 <span>通知铃声</span>
-                <select value={sound} onChange={(event) => setSound(event.target.value)}>
-                  {SOUNDS.map(([value, label]) => (
-                    <option value={value} key={value || "default"}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                <SelectMenu
+                  label="通知铃声"
+                  value={sound}
+                  onChange={setSound}
+                  options={SOUNDS.map(([value, label]) => ({
+                    value,
+                    label,
+                    description: value
+                      ? value === "silence"
+                        ? "不播放提示音"
+                        : `系统铃声 · ${value}`
+                      : "使用 Bark 默认设置",
+                  }))}
+                />
               </label>
             </div>
 
