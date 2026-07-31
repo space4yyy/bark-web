@@ -83,6 +83,7 @@ export default function Home() {
   const [sending, setSending] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [serverMenuOpen, setServerMenuOpen] = useState(false);
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [deviceName, setDeviceName] = useState("");
   const [deviceKey, setDeviceKey] = useState("");
@@ -103,6 +104,7 @@ export default function Home() {
   const [autoCopy, setAutoCopy] = useState(false);
   const [isArchive, setIsArchive] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const serverMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
@@ -134,6 +136,28 @@ export default function Home() {
     const timer = window.setTimeout(() => setNotice(null), 4200);
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  useEffect(() => {
+    function closeServerMenu(event: MouseEvent) {
+      if (
+        serverMenuRef.current &&
+        !serverMenuRef.current.contains(event.target as Node)
+      ) {
+        setServerMenuOpen(false);
+      }
+    }
+
+    function closeServerMenuWithKeyboard(event: KeyboardEvent) {
+      if (event.key === "Escape") setServerMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", closeServerMenu);
+    document.addEventListener("keydown", closeServerMenuWithKeyboard);
+    return () => {
+      document.removeEventListener("mousedown", closeServerMenu);
+      document.removeEventListener("keydown", closeServerMenuWithKeyboard);
+    };
+  }, []);
 
   const activeServer =
     config.servers.find((server) => server.id === config.activeServerId) ??
@@ -391,24 +415,67 @@ export default function Home() {
       <div className="workspace">
         <aside className="device-panel">
           <div className="panel-heading">
-            <div>
+            <div className="server-select" ref={serverMenuRef}>
               <span className="eyebrow">当前服务器</span>
-              <select
-                aria-label="当前 Bark 服务器"
-                value={activeServer?.id}
-                onChange={(event) =>
-                  setConfig((current) => ({
-                    ...current,
-                    activeServerId: event.target.value,
-                  }))
-                }
+              <button
+                className="server-select-trigger"
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded={serverMenuOpen}
+                onClick={() => setServerMenuOpen((open) => !open)}
               >
-                {config.servers.map((server) => (
-                  <option key={server.id} value={server.id}>
-                    {server.name}
-                  </option>
-                ))}
-              </select>
+                <span>{activeServer?.name}</span>
+                <span className={`select-chevron ${serverMenuOpen ? "open" : ""}`} />
+              </button>
+              {serverMenuOpen && (
+                <div
+                  className="server-select-menu"
+                  role="listbox"
+                  aria-label="选择 Bark 服务器"
+                >
+                  {config.servers.map((server) => {
+                    const selected = server.id === activeServer?.id;
+                    return (
+                      <button
+                        key={server.id}
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        className={selected ? "selected" : ""}
+                        onClick={() => {
+                          setConfig((current) => ({
+                            ...current,
+                            activeServerId: server.id,
+                          }));
+                          setServerMenuOpen(false);
+                        }}
+                      >
+                        <span className="server-option-mark">
+                          {server.name.slice(0, 1)}
+                        </span>
+                        <span className="server-option-copy">
+                          <strong>{server.name}</strong>
+                          <small>{server.devices.length} 个设备</small>
+                        </span>
+                        <span className="server-option-check">
+                          {selected ? "✓" : ""}
+                        </span>
+                      </button>
+                    );
+                  })}
+                  <button
+                    className="server-menu-manage"
+                    type="button"
+                    onClick={() => {
+                      setServerMenuOpen(false);
+                      setShowSettings(true);
+                    }}
+                  >
+                    <span>＋</span>
+                    添加或管理服务器
+                  </button>
+                </div>
+              )}
             </div>
             <button
               className="small-ghost"

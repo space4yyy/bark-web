@@ -254,24 +254,175 @@ select {
   text-transform: uppercase;
 }
 
-.panel-heading select {
-  max-width: 232px;
-  padding: 0 22px 0 0;
-  border: 0;
-  appearance: none;
+.server-select {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+}
+
+.server-select-trigger {
+  max-width: 238px;
+  min-height: 34px;
+  margin-left: -8px;
+  padding: 4px 9px 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
   background: transparent;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--ink) 50%),
-    linear-gradient(135deg, var(--ink) 50%, transparent 50%);
-  background-position:
-    calc(100% - 8px) 50%,
-    calc(100% - 3px) 50%;
-  background-size: 5px 5px, 5px 5px;
-  background-repeat: no-repeat;
   color: var(--ink);
+  text-align: left;
+  transition: background 0.18s, border-color 0.18s;
+}
+
+.server-select-trigger:hover,
+.server-select-trigger[aria-expanded="true"] {
+  border-color: #d6dfd7;
+  background: #f0f5f0;
+}
+
+.server-select-trigger > span:first-child {
+  overflow: hidden;
   font-family: Georgia, "Songti SC", serif;
   font-size: 19px;
   font-weight: 700;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-chevron {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.18s;
+}
+
+.select-chevron.open {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.server-select-menu {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 7px);
+  left: -8px;
+  width: min(290px, calc(100vw - 44px));
+  padding: 6px;
+  display: grid;
+  gap: 3px;
+  border: 1px solid #d4ddd5;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 16px 42px rgba(25, 42, 31, 0.16);
+  backdrop-filter: blur(12px);
+  transform-origin: top left;
+  animation: menu-in 0.14s ease-out;
+}
+
+.server-select-menu > button:not(.server-menu-manage) {
+  width: 100%;
+  min-width: 0;
+  padding: 9px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+}
+
+.server-select-menu > button:not(.server-menu-manage):hover {
+  background: #f2f5f1;
+}
+
+.server-select-menu > button.selected {
+  background: var(--green-pale);
+}
+
+.server-option-mark {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #e7ebe7;
+  color: #526158;
+  font-family: Georgia, serif;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.selected .server-option-mark {
+  background: var(--green);
+  color: white;
+}
+
+.server-option-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.server-option-copy strong,
+.server-option-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.server-option-copy strong {
+  font-size: 11px;
+}
+
+.server-option-copy small {
+  color: var(--soft);
+  font-size: 9px;
+  font-weight: 400;
+}
+
+.server-option-check {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.server-menu-manage {
+  width: 100%;
+  margin-top: 3px;
+  padding: 9px 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--green);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.server-menu-manage:hover {
+  background: #f5f8f4;
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .small-ghost {
