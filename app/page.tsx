@@ -200,6 +200,9 @@ export default function Home() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showMobileDevices, setShowMobileDevices] = useState(false);
+  const [showNotificationSettings, setShowNotificationSettings] =
+    useState(false);
   const [showIconAdd, setShowIconAdd] = useState(false);
   const [editingIcons, setEditingIcons] = useState(false);
   const [iconUrlDraft, setIconUrlDraft] = useState("");
@@ -1117,6 +1120,34 @@ export default function Home() {
         </aside>
 
         <section className="composer-panel">
+          <button
+            className={`mobile-recipient-bar mobile-only ${
+              selectedDevices.length ? "ready" : "missing"
+            }`}
+            type="button"
+            onClick={() => setShowMobileDevices(true)}
+          >
+            <span className="mobile-recipient-label">
+              <small>{tr("接收设备", "Recipients")}</small>
+              <strong>
+                {selectedDevices.length
+                  ? selectedDevices.length === 1
+                    ? selectedDevices[0].name
+                    : tr(
+                        `${selectedDevices[0].name} 等 ${selectedDevices.length} 个设备`,
+                        `${selectedDevices[0].name} and ${selectedDevices.length - 1} more`,
+                      )
+                  : tr("尚未选择设备", "No recipients selected")}
+              </strong>
+            </span>
+            <span className="mobile-recipient-action">
+              {selectedDevices.length
+                ? tr("修改", "Change")
+                : tr("选择", "Choose")}
+              <span aria-hidden="true">›</span>
+            </span>
+          </button>
+
           <div className="composer-heading">
             <div>
               <span className="eyebrow">{tr("新通知", "New notification")}</span>
@@ -1277,62 +1308,127 @@ export default function Home() {
               <small>{body.length} / 1000</small>
             </label>
 
-            <div className="field-row">
-              <label className="field">
-                <span>{tr("提醒级别", "Interruption level")}</span>
-                <SelectMenu
-                  label={tr("提醒级别", "Interruption level")}
-                  value={level}
-                  onChange={setLevel}
-                  options={LEVELS.map(([value, enLabel, zhLabel, enDescription, zhDescription]) => ({
-                    value,
-                    label: tr(zhLabel, enLabel),
-                    description: tr(zhDescription, enDescription),
-                  }))}
-                />
-              </label>
-              <label className="field">
-                <span>{tr("通知铃声", "Sound")}</span>
-                <SelectMenu
-                  label={tr("通知铃声", "Sound")}
-                  value={sound}
-                  onChange={setSound}
-                  options={SOUNDS.map(([value, enLabel, zhLabel]) => ({
-                    value,
-                    label: tr(zhLabel, enLabel),
-                    description: value
-                      ? value === "silence"
-                        ? tr("不播放提示音", "No notification sound")
-                        : tr(`系统铃声 · ${value}`, `System sound · ${value}`)
-                      : tr("使用 Bark 默认设置", "Use the Bark default"),
-                  }))}
-                />
-              </label>
-            </div>
-
-            {level === "critical" && (
-              <label className="volume-field">
-                <span>
-                  <strong>{tr("重要警告音量", "Critical alert volume")}</strong>
-                  <small>
-                    {tr(
-                      "即使设备处于静音模式也会响铃",
-                      "Can play even when the device is in Silent mode",
-                    )}
-                  </small>
+            <button
+              className="mobile-notification-toggle mobile-only"
+              type="button"
+              onClick={() =>
+                setShowNotificationSettings((current) => !current)
+              }
+              aria-expanded={showNotificationSettings}
+            >
+              <span>
+                <strong>{tr("通知设置", "Notification settings")}</strong>
+                <small>
+                  {tr(
+                    `${
+                      LEVELS.find(([value]) => value === level)?.[2] ??
+                      "主动提醒"
+                    } · ${
+                      SOUNDS.find(([value]) => value === sound)?.[2] ??
+                      SOUNDS.find(([value]) => value === sound)?.[1] ??
+                      "默认铃声"
+                    }`,
+                    `${
+                      LEVELS.find(([value]) => value === level)?.[1] ??
+                      "Active"
+                    } · ${
+                      SOUNDS.find(([value]) => value === sound)?.[1] ??
+                      "Default"
+                    }`,
+                  )}
+                </small>
+              </span>
+              <span>
+                {showNotificationSettings
+                  ? tr("收起", "Collapse")
+                  : tr("展开", "Expand")}{" "}
+                <span aria-hidden="true">
+                  {showNotificationSettings ? "⌃" : "›"}
                 </span>
-                <input
-                  type="range"
-                  min="0"
-                  max="10"
-                  step="1"
-                  value={volume}
-                  onChange={(event) => setVolume(event.target.value)}
-                  aria-label={tr("重要警告音量", "Critical alert volume")}
-                />
-                <output>{volume} / 10</output>
-              </label>
-            )}
+              </span>
+            </button>
+
+            <div
+              className={`notification-settings ${
+                showNotificationSettings ? "open" : ""
+              }`}
+            >
+              <div className="field-row">
+                <label className="field">
+                  <span>{tr("提醒级别", "Interruption level")}</span>
+                  <SelectMenu
+                    label={tr("提醒级别", "Interruption level")}
+                    value={level}
+                    onChange={setLevel}
+                    options={LEVELS.map(
+                      ([
+                        value,
+                        enLabel,
+                        zhLabel,
+                        enDescription,
+                        zhDescription,
+                      ]) => ({
+                        value,
+                        label: tr(zhLabel, enLabel),
+                        description: tr(zhDescription, enDescription),
+                      }),
+                    )}
+                  />
+                </label>
+                <label className="field">
+                  <span>{tr("通知铃声", "Sound")}</span>
+                  <SelectMenu
+                    label={tr("通知铃声", "Sound")}
+                    value={sound}
+                    onChange={setSound}
+                    options={SOUNDS.map(([value, enLabel, zhLabel]) => ({
+                      value,
+                      label: tr(zhLabel, enLabel),
+                      description: value
+                        ? value === "silence"
+                          ? tr("不播放提示音", "No notification sound")
+                          : tr(
+                              `系统铃声 · ${value}`,
+                              `System sound · ${value}`,
+                            )
+                        : tr(
+                            "使用 Bark 默认设置",
+                            "Use the Bark default",
+                          ),
+                    }))}
+                  />
+                </label>
+              </div>
+
+              {level === "critical" && (
+                <label className="volume-field">
+                  <span>
+                    <strong>
+                      {tr("重要警告音量", "Critical alert volume")}
+                    </strong>
+                    <small>
+                      {tr(
+                        "即使设备处于静音模式也会响铃",
+                        "Can play even when the device is in Silent mode",
+                      )}
+                    </small>
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="10"
+                    step="1"
+                    value={volume}
+                    onChange={(event) => setVolume(event.target.value)}
+                    aria-label={tr(
+                      "重要警告音量",
+                      "Critical alert volume",
+                    )}
+                  />
+                  <output>{volume} / 10</output>
+                </label>
+              )}
+            </div>
 
             <button
               className="advanced-toggle"
@@ -1436,9 +1532,207 @@ export default function Home() {
                 </span>
               </button>
             </div>
+
+            <div className="mobile-send-bar mobile-only">
+              <span>
+                {selectedDevices.length
+                  ? deviceCount(selectedDevices.length)
+                  : tr("未选择接收设备", "No recipients")}
+              </span>
+              <button
+                type={selectedDevices.length ? "submit" : "button"}
+                onClick={
+                  selectedDevices.length
+                    ? undefined
+                    : () => setShowMobileDevices(true)
+                }
+                disabled={
+                  sending ||
+                  (selectedDevices.length > 0 && !body.trim())
+                }
+              >
+                {sending
+                  ? tr("发送中…", "Sending…")
+                  : !selectedDevices.length
+                    ? tr("选择接收设备", "Choose recipients")
+                    : !body.trim()
+                      ? tr("请填写通知内容", "Enter a message")
+                      : tr(
+                          `发送给 ${selectedDevices.length} 个设备`,
+                          `Send to ${selectedDevices.length}`,
+                        )}
+              </button>
+            </div>
           </form>
         </section>
       </div>
+
+      {showMobileDevices && (
+        <div
+          className="modal-backdrop mobile-device-backdrop"
+          onMouseDown={() => setShowMobileDevices(false)}
+        >
+          <section
+            className="mobile-device-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-device-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="mobile-sheet-heading">
+              <div>
+                <span className="eyebrow">
+                  {tr("通知接收人", "Notification recipients")}
+                </span>
+                <h2 id="mobile-device-title">
+                  {tr("选择接收设备", "Choose recipients")}
+                </h2>
+              </div>
+              <button
+                className="close-button"
+                type="button"
+                onClick={() => setShowMobileDevices(false)}
+                aria-label={tr(
+                  "关闭设备选择窗口",
+                  "Close recipient picker",
+                )}
+              >
+                ×
+              </button>
+            </div>
+
+            {config.servers.length > 1 && (
+              <div
+                className="mobile-server-tabs"
+                role="tablist"
+                aria-label={tr("选择 Bark 服务器", "Choose a Bark server")}
+              >
+                {config.servers.map((server) => {
+                  const selected = server.id === activeServer?.id;
+                  return (
+                    <button
+                      key={server.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      className={selected ? "selected" : ""}
+                      onClick={() =>
+                        setConfig((current) => ({
+                          ...current,
+                          activeServerId: server.id,
+                        }))
+                      }
+                    >
+                      {server.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="mobile-device-sheet-title">
+              <span>
+                <strong>
+                  {activeServer?.name ??
+                    tr("尚未添加服务器", "No server added")}
+                </strong>
+                <small>
+                  {deviceCount(activeServer?.devices.length ?? 0)}
+                </small>
+              </span>
+              {activeServer && activeServer.devices.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedDeviceIds((current) => {
+                      const activeIds = activeServer.devices.map(
+                        (device) => device.id,
+                      );
+                      const allSelected = activeIds.every((id) =>
+                        current.includes(id),
+                      );
+                      return allSelected
+                        ? current.filter((id) => !activeIds.includes(id))
+                        : Array.from(new Set([...current, ...activeIds]));
+                    })
+                  }
+                >
+                  {selectedDevices.length === activeServer.devices.length
+                    ? tr("取消全选", "Deselect all")
+                    : tr("全选", "Select all")}
+                </button>
+              )}
+            </div>
+
+            <div className="mobile-device-list">
+              {activeServer?.devices.length ? (
+                activeServer.devices.map((device) => {
+                  const checked = selectedDeviceIds.includes(device.id);
+                  return (
+                    <button
+                      key={device.id}
+                      type="button"
+                      className={`device-card ${checked ? "selected" : ""}`}
+                      onClick={() => toggleDevice(device.id)}
+                    >
+                      <span className="device-check">
+                        {checked ? "✓" : ""}
+                      </span>
+                      <span className="device-avatar">
+                        {device.name.slice(0, 1).toUpperCase()}
+                      </span>
+                      <span className="device-copy">
+                        <strong>{device.name}</strong>
+                        <span>{maskKey(device.key)}</span>
+                      </span>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="mobile-device-empty">
+                  <strong>
+                    {activeServer
+                      ? tr("还没有接收设备", "No devices yet")
+                      : tr("还没有 Bark 地址", "No Bark links yet")}
+                  </strong>
+                  <p>
+                    {tr(
+                      "添加完整 Bark 地址后即可选择接收设备。",
+                      "Add a complete Bark link to choose a recipient.",
+                    )}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMobileDevices(false);
+                      setShowImport(true);
+                    }}
+                  >
+                    {tr("添加 Bark 地址", "Add Bark link")}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="mobile-device-sheet-footer">
+              <span>
+                {selectedDevices.length
+                  ? tr(
+                      `已选择 ${selectedDevices.length} 个设备`,
+                      `${selectedDevices.length} selected`,
+                    )
+                  : tr("尚未选择设备", "No recipients selected")}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowMobileDevices(false)}
+              >
+                {tr("完成", "Done")}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {showIconAdd && (
         <div
