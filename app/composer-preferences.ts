@@ -68,6 +68,19 @@ function isHttpUrl(value: unknown): value is string {
   }
 }
 
+export function sanitizeIconLibrary(value: unknown): string[] {
+  return Array.isArray(value)
+    ? Array.from(new Set(value.filter(isHttpUrl)))
+    : [];
+}
+
+export function sanitizeSelectedIcon(
+  value: unknown,
+  iconLibrary: string[],
+): string {
+  return typeof value === "string" && iconLibrary.includes(value) ? value : "";
+}
+
 export function readComposerPreferences(
   storage: StorageLike,
 ): ComposerPreferences {
@@ -83,14 +96,11 @@ export function readComposerPreferences(
     )
       ? (parsed.level as ComposerPreferences["level"])
       : DEFAULT_COMPOSER_PREFERENCES.level;
-    const iconLibrary = Array.isArray(parsed.iconLibrary)
-      ? Array.from(new Set(parsed.iconLibrary.filter(isHttpUrl)))
-      : DEFAULT_COMPOSER_PREFERENCES.iconLibrary;
-    const selectedIcon =
-      typeof parsed.selectedIcon === "string" &&
-      iconLibrary.includes(parsed.selectedIcon)
-        ? parsed.selectedIcon
-        : DEFAULT_COMPOSER_PREFERENCES.selectedIcon;
+    const iconLibrary = sanitizeIconLibrary(parsed.iconLibrary);
+    const selectedIcon = sanitizeSelectedIcon(
+      parsed.selectedIcon,
+      iconLibrary,
+    );
 
     return {
       useMarkdown: booleanOrDefault(

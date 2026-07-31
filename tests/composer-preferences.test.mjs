@@ -4,6 +4,8 @@ import {
   clearComposerPreferences,
   DEFAULT_COMPOSER_PREFERENCES,
   readComposerPreferences,
+  sanitizeIconLibrary,
+  sanitizeSelectedIcon,
   writeComposerPreferences,
 } from "../app/composer-preferences.ts";
 
@@ -85,6 +87,29 @@ test("restores an empty icon selection and removes invalid or duplicate icons", 
     "https://file.space4.ink/759676328_n.jpg",
   ]);
   assert.equal(preferences.selectedIcon, "");
+});
+
+test("sanitizes icon URLs restored from a configuration backup", () => {
+  const icons = sanitizeIconLibrary([
+    "https://file.space4.ink/759676328_n.jpg",
+    "https://file.space4.ink/759676328_n.jpg",
+    "javascript:alert(1)",
+  ]);
+
+  assert.deepEqual(icons, [
+    "https://file.space4.ink/759676328_n.jpg",
+  ]);
+  assert.equal(
+    sanitizeSelectedIcon(
+      "https://file.space4.ink/759676328_n.jpg",
+      icons,
+    ),
+    "https://file.space4.ink/759676328_n.jpg",
+  );
+  assert.equal(
+    sanitizeSelectedIcon("https://example.com/missing.png", icons),
+    "",
+  );
 });
 
 test("clears composer preferences from storage", () => {

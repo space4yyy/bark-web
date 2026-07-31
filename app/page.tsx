@@ -9,6 +9,8 @@ import {
   clearComposerPreferences,
   DEFAULT_COMPOSER_PREFERENCES,
   readComposerPreferences,
+  sanitizeIconLibrary,
+  sanitizeSelectedIcon,
   writeComposerPreferences,
 } from "./composer-preferences";
 
@@ -755,7 +757,13 @@ export default function Home() {
     ) {
       return;
     }
-    const blob = new Blob([JSON.stringify(config, null, 2)], {
+    const backup = {
+      ...config,
+      version: 3,
+      iconLibrary,
+      selectedIcon: icon,
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
@@ -776,9 +784,13 @@ export default function Home() {
           version?: number;
           activeServerId?: string;
           servers?: BarkServer[];
+          iconLibrary?: unknown;
+          selectedIcon?: unknown;
         };
         if (
-          (parsed.version !== 1 && parsed.version !== 2) ||
+          (parsed.version !== 1 &&
+            parsed.version !== 2 &&
+            parsed.version !== 3) ||
           !Array.isArray(parsed.servers)
         ) {
           throw new Error();
@@ -792,6 +804,13 @@ export default function Home() {
             parsed.servers[0]?.id ??
             "",
         });
+        if (parsed.version === 3) {
+          const restoredIcons = sanitizeIconLibrary(parsed.iconLibrary);
+          setIconLibrary(restoredIcons);
+          setIcon(
+            sanitizeSelectedIcon(parsed.selectedIcon, restoredIcons),
+          );
+        }
         setNotice({
           type: "success",
           text: tr("配置已从备份恢复。", "Configuration restored from backup."),
