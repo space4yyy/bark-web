@@ -50,6 +50,29 @@ test("rejects cross-site callers", async () => {
   assert.equal(response.status, 403);
 });
 
+test("allows public same-origin callers without OpenAI identity headers", async () => {
+  const fetcher = async () =>
+    Response.json({ code: 200, message: "success" });
+  const request = new Request(
+    "https://bark-web.example/api/bark/push",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://bark-web.example",
+      },
+      body: JSON.stringify({
+        server_url: "https://api.day.app",
+        payload: { device_key: "device-test", body: "hello" },
+      }),
+    },
+  );
+
+  const response = await handleBarkProxyRequest(request, fetcher);
+
+  assert.equal(response.status, 200);
+});
+
 test("blocks private network targets in production", async () => {
   const request = new Request("https://bark-console.example/api/bark/push", {
     method: "POST",

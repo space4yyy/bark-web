@@ -74,9 +74,6 @@ export async function handleBarkProxyRequest(
   if (origin && origin !== requestUrl.origin) {
     return jsonError(403, requestMessage(request, "请求来源无效。", "The request origin is invalid."));
   }
-  if (!isLocal && !request.headers.get("oai-authenticated-user-id")) {
-    return jsonError(401, requestMessage(request, "请先登录后再发送通知。", "Sign in before sending a notification."));
-  }
 
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (contentLength > MAX_REQUEST_BYTES) {
