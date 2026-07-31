@@ -30,6 +30,11 @@ type Notice = {
   text: string;
 };
 
+type ConfirmTarget =
+  | { kind: "server"; server: BarkServer }
+  | { kind: "device"; device: Device }
+  | { kind: "clear" };
+
 const STORAGE_KEY = "bark-console-config-v1";
 const BACKUP_WARNING_KEY = "bark-console-backup-warning-dismissed-v1";
 
@@ -174,6 +179,7 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [backupWarningDismissed, setBackupWarningDismissed] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
   const [serverMenuOpen, setServerMenuOpen] = useState(false);
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [barkLinks, setBarkLinks] = useState("");
@@ -371,12 +377,7 @@ export default function Home() {
   }
 
   function removeDevice(device: Device) {
-    if (!window.confirm(`从此浏览器移除「${device.name}」？`)) return;
-    updateActiveServer((server) => ({
-      ...server,
-      devices: server.devices.filter((item) => item.id !== device.id),
-    }));
-    setSelectedDeviceIds((ids) => ids.filter((id) => id !== device.id));
+    setConfirmTarget({ kind: "device", device });
   }
 
   function addServer(event: FormEvent) {
@@ -404,18 +405,7 @@ export default function Home() {
   }
 
   function removeServer(server: BarkServer) {
-    if (!window.confirm(`删除「${server.name}」及其 ${server.devices.length} 个本地设备配置？`)) {
-      return;
-    }
-    const remaining = config.servers.filter((item) => item.id !== server.id);
-    setConfig({
-      ...config,
-      servers: remaining,
-      activeServerId:
-        config.activeServerId === server.id
-          ? (remaining[0]?.id ?? "")
-          : config.activeServerId,
-    });
+    setConfirmTarget({ kind: "server", server });
   }
 
   function startEditingServer(server: BarkServer) {
@@ -613,13 +603,49 @@ export default function Home() {
   }
 
   function clearAllData() {
-    if (!window.confirm("确定清除本浏览器中的全部服务器和 Device Key？此操作无法撤销。")) {
-      return;
+    setConfirmTarget({ kind: "clear" });
+  }
+
+  function executeConfirmedAction() {
+    if (!confirmTarget) return;
+
+    if (confirmTarget.kind === "device") {
+      const { device } = confirmTarget;
+      updateActiveServer((server) => ({
+        ...server,
+        devices: server.devices.filter((item) => item.id !== device.id),
+      }));
+      setSelectedDeviceIds((ids) => ids.filter((id) => id !== device.id));
+      setNotice({ type: "success", text: `已移除设备「${device.name}」` });
     }
-    setConfig(DEFAULT_CONFIG);
-    setSelectedDeviceIds([]);
-    localStorage.removeItem(STORAGE_KEY);
-    setNotice({ type: "success", text: "本地配置已清除。" });
+
+    if (confirmTarget.kind === "server") {
+      const { server } = confirmTarget;
+      const remaining = config.servers.filter((item) => item.id !== server.id);
+      setConfig({
+        ...config,
+        servers: remaining,
+        activeServerId:
+          config.activeServerId === server.id
+            ? (remaining[0]?.id ?? "")
+            : config.activeServerId,
+      });
+      setSelectedDeviceIds((ids) =>
+        ids.filter(
+          (id) => !server.devices.some((device) => device.id === id),
+        ),
+      );
+      setNotice({ type: "success", text: `已删除服务器「${server.name}」` });
+    }
+
+    if (confirmTarget.kind === "clear") {
+      setConfig(DEFAULT_CONFIG);
+      setSelectedDeviceIds([]);
+      localStorage.removeItem(STORAGE_KEY);
+      setNotice({ type: "success", text: "本地配置已清除。" });
+    }
+
+    setConfirmTarget(null);
   }
 
   if (!ready) {
@@ -1341,6 +1367,54 @@ export default function Home() {
               </button>
               <button className="danger-button" onClick={clearAllData}>
                 清除全部本地数据
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {confirmTarget && (
+        <div
+          className="modal-backdrop confirm-backdrop"
+          onMouseDown={() => setConfirmTarget(null)}
+        >
+          <section
+            className="confirm-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="confirm-title"
+            aria-describedby="confirm-description"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <span className="confirm-icon" aria-hidden="true">
+              !
+            </span>
+            <div className="confirm-copy">
+              <span className="eyebrow">危险操作</span>
+              <h2 id="confirm-title">
+                {confirmTarget.kind === "device" && "移除这个设备？"}
+                {confirmTarget.kind === "server" && "删除这个服务器？"}
+                {confirmTarget.kind === "clear" && "清除全部本地数据？"}
+              </h2>
+              <p id="confirm-description">
+                {confirmTarget.kind === "device" &&
+                  `「${confirmTarget.device.name}」的 Device Key 将从此浏览器移除。`}
+                {confirmTarget.kind === "server" &&
+                  `「${confirmTarget.server.name}」及其 ${confirmTarget.server.devices.length} 个设备配置将被删除。`}
+                {confirmTarget.kind === "clear" &&
+                  "所有服务器、设备名称和 Device Key 都将从此浏览器删除。"}
+              </p>
+              <small>此操作无法撤销，请确认已按需导出备份。</small>
+            </div>
+            <div className="confirm-actions">
+              <button
+                className="secondary-button"
+                onClick={() => setConfirmTarget(null)}
+              >
+                取消
+              </button>
+              <button className="confirm-danger-button" onClick={executeConfirmedAction}>
+                {confirmTarget.kind === "device" ? "确认移除" : "确认删除"}
               </button>
             </div>
           </section>

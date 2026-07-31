@@ -1235,6 +1235,88 @@ textarea:focus {
   min-height: 40px;
 }
 
+.confirm-backdrop {
+  z-index: 30;
+}
+
+.confirm-modal {
+  width: min(470px, 100%);
+  padding: 26px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 16px;
+  border: 1px solid #efd2cf;
+  border-radius: 17px;
+  background: white;
+  box-shadow: 0 32px 90px rgba(55, 20, 17, 0.25);
+}
+
+.confirm-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #fbe9e7;
+  color: var(--red);
+  font-family: Georgia, serif;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.confirm-copy .eyebrow {
+  margin-bottom: 5px;
+  color: var(--red);
+}
+
+.confirm-copy h2 {
+  margin: 0;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 22px;
+  letter-spacing: -0.025em;
+}
+
+.confirm-copy p {
+  margin: 9px 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.confirm-copy small {
+  color: var(--soft);
+  font-size: 9px;
+}
+
+.confirm-actions {
+  grid-column: 1 / -1;
+  margin-top: 7px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.confirm-actions .secondary-button,
+.confirm-danger-button {
+  min-width: 92px;
+  min-height: 40px;
+}
+
+.confirm-danger-button {
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--red);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  box-shadow: 0 6px 16px rgba(181, 68, 58, 0.2);
+}
+
+.confirm-danger-button:hover {
+  background: #98372f;
+}
+
 .modal-heading {
   padding: 25px 28px 20px;
   display: flex;
@@ -1636,6 +1718,12 @@ textarea:focus {
 
   .import-modal {
     width: 100%;
+    border-radius: 18px 18px 0 0;
+  }
+
+  .confirm-modal {
+    width: 100%;
+    padding: 24px 18px;
     border-radius: 18px 18px 0 0;
   }
 
