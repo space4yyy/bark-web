@@ -328,7 +328,6 @@ export default function Home() {
     let added = 0;
     let duplicates = 0;
     let firstTargetServerId = "";
-    const newDeviceIds: string[] = [];
     const servers = config.servers.map((server) => ({
       ...server,
       devices: [...server.devices],
@@ -353,7 +352,6 @@ export default function Home() {
       }
       const device = { id: makeId(), name: deviceName, key };
       server.devices.push(device);
-      newDeviceIds.push(device.id);
       added += 1;
     });
     setConfig({
@@ -361,7 +359,6 @@ export default function Home() {
       servers,
       activeServerId: firstTargetServerId || config.activeServerId,
     });
-    setSelectedDeviceIds(newDeviceIds);
     setBarkLinks("");
     setShowImport(false);
     setNotice({
