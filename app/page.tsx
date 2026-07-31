@@ -1212,7 +1212,19 @@ export default function Home() {
                 {config.servers.length === 0 && (
                   <div className="settings-empty">
                     <strong>还没有服务器</strong>
-                    <span>从左侧粘贴完整 Bark 链接，或在下方手动添加。</span>
+                    <span>
+                      点击按钮粘贴完整 Bark 链接，或使用下方表单手动添加服务器。
+                    </span>
+                    <button
+                      className="settings-add-link"
+                      onClick={() => {
+                        setShowSettings(false);
+                        setShowImport(true);
+                      }}
+                    >
+                      <span aria-hidden="true">＋</span>
+                      添加 Bark 地址
+                    </button>
                   </div>
                 )}
               </div>
