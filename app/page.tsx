@@ -709,7 +709,7 @@ export default function Home() {
     if (jumpUrl.trim()) payloadBase.url = jumpUrl.trim();
     if (copy.trim()) payloadBase.copy = copy.trim();
     if (autoCopy) payloadBase.autoCopy = 1;
-    if (isArchive) payloadBase.isArchive = 1;
+    payloadBase.isArchive = isArchive ? 1 : 0;
 
     try {
       const results = await Promise.allSettled(
