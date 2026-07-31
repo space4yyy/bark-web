@@ -355,6 +355,30 @@ export default function Home() {
   }, [notice]);
 
   useEffect(() => {
+    if (!showMobileDevices) return;
+
+    const scrollPosition = window.scrollY;
+    const previous = {
+      overflow: document.body.style.overflow,
+      position: document.body.style.position,
+      top: document.body.style.top,
+      width: document.body.style.width,
+    };
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollPosition}px`;
+    document.body.style.width = "100%";
+
+    return () => {
+      document.body.style.overflow = previous.overflow;
+      document.body.style.position = previous.position;
+      document.body.style.top = previous.top;
+      document.body.style.width = previous.width;
+      window.scrollTo(0, scrollPosition);
+    };
+  }, [showMobileDevices]);
+
+  useEffect(() => {
     function closeServerMenu(event: MouseEvent) {
       if (
         serverMenuRef.current &&
@@ -1620,40 +1644,35 @@ export default function Home() {
               </button>
             </div>
 
-            {config.servers.length > 1 && (
-              <div
-                className="mobile-server-tabs"
-                role="tablist"
-                aria-label={tr("选择 Bark 服务器", "Choose a Bark server")}
-              >
-                {config.servers.map((server) => {
-                  const selected = server.id === activeServer?.id;
-                  return (
-                    <button
-                      key={server.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={selected}
-                      className={selected ? "selected" : ""}
-                      onClick={() =>
-                        setConfig((current) => ({
-                          ...current,
-                          activeServerId: server.id,
-                        }))
-                      }
-                    >
-                      {server.name}
-                    </button>
-                  );
-                })}
+            {config.servers.length > 0 && activeServer && (
+              <div className="mobile-server-picker">
+                <span>{tr("Bark 服务器", "Bark server")}</span>
+                <SelectMenu
+                  label={tr("选择 Bark 服务器", "Choose a Bark server")}
+                  value={activeServer.id}
+                  onChange={(serverId) =>
+                    setConfig((current) => ({
+                      ...current,
+                      activeServerId: serverId,
+                    }))
+                  }
+                  options={config.servers.map((server) => ({
+                    value: server.id,
+                    label: server.name,
+                    description: `${server.url} · ${deviceCount(
+                      server.devices.length,
+                    )}`,
+                  }))}
+                />
               </div>
             )}
 
             <div className="mobile-device-sheet-title">
               <span>
                 <strong>
-                  {activeServer?.name ??
-                    tr("尚未添加服务器", "No server added")}
+                  {activeServer
+                    ? tr("接收设备", "Recipients")
+                    : tr("尚未添加服务器", "No server added")}
                 </strong>
                 <small>
                   {deviceCount(activeServer?.devices.length ?? 0)}
