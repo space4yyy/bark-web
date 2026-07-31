@@ -1078,7 +1078,7 @@ export default function Home() {
                   value={barkLinks}
                   onChange={(event) => setBarkLinks(event.target.value)}
                   placeholder={
-                    "space4 https://bark.example.com/DeviceKey/推送内容\nipad https://api.day.app/AnotherKey/推送内容"
+                    "我的手机 https://bark.example.com/DemoDeviceKey_123456/推送内容\n平板 https://api.day.app/AnotherDemoKey_789/推送内容"
                   }
                   autoComplete="off"
                   autoFocus

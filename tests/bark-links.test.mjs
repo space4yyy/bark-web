@@ -9,11 +9,11 @@ import {
 test("extracts the server and device key from a full Bark link", () => {
   assert.deepEqual(
     parseBarkLink(
-      "https://bark.readonly.space/G9py3QmfMH3ayBiPYRW4tA/这里改成你自己的推送内容",
+      "https://bark.example.com/DemoDeviceKey_123456/这里改成你自己的推送内容",
     ),
     {
-      serverUrl: "https://bark.readonly.space",
-      key: "G9py3QmfMH3ayBiPYRW4tA",
+      serverUrl: "https://bark.example.com",
+      key: "DemoDeviceKey_123456",
     },
   );
 });
@@ -35,12 +35,12 @@ test("rejects links without a device key", () => {
 test("parses a device name separated by one space", () => {
   assert.deepEqual(
     parseBarkImportLine(
-      "space4 https://bark.readonly.space/G9py3QmfMH3ayBiPYRW4tA/这里改成你自己的推送内容",
+      "我的手机 https://bark.example.com/DemoDeviceKey_123456/这里改成你自己的推送内容",
     ),
     {
-      serverUrl: "https://bark.readonly.space",
-      key: "G9py3QmfMH3ayBiPYRW4tA",
-      deviceName: "space4",
+      serverUrl: "https://bark.example.com",
+      key: "DemoDeviceKey_123456",
+      deviceName: "我的手机",
     },
   );
 });
@@ -49,14 +49,14 @@ test("rejects irregular whitespace without partially parsing the line", () => {
   assert.throws(
     () =>
       parseBarkImportLine(
-        "space4  https://bark.readonly.space/G9py3QmfMH3ayBiPYRW4tA/body",
+        "我的手机  https://bark.example.com/DemoDeviceKey_123456/body",
       ),
     /一个半角空格/,
   );
   assert.throws(
     () =>
       parseBarkImportLine(
-        "space4\thttps://bark.readonly.space/G9py3QmfMH3ayBiPYRW4tA/body",
+        "我的手机\thttps://bark.example.com/DemoDeviceKey_123456/body",
       ),
     /一个半角空格/,
   );
@@ -64,8 +64,8 @@ test("rejects irregular whitespace without partially parsing the line", () => {
 
 test("uses the server address without protocol as the default name", () => {
   assert.equal(
-    defaultServerName("https://bark.readonly.space"),
-    "bark.readonly.space",
+    defaultServerName("https://bark.example.com"),
+    "bark.example.com",
   );
   assert.equal(defaultServerName("https://example.com:8443"), "example.com:8443");
 });
