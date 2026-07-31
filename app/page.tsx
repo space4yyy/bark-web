@@ -39,9 +39,11 @@ type Notice = {
 type ConfirmTarget =
   | { kind: "server"; server: BarkServer }
   | { kind: "device"; device: Device }
+  | { kind: "icon"; url: string }
   | { kind: "clear" };
 
 type Locale = "zh" | "en";
+type IconPreviewStatus = "idle" | "loading" | "ready" | "error";
 
 const STORAGE_KEY = "bark-console-config-v1";
 const BACKUP_WARNING_KEY = "bark-console-backup-warning-dismissed-v1";
@@ -198,6 +200,11 @@ export default function Home() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showIconAdd, setShowIconAdd] = useState(false);
+  const [editingIcons, setEditingIcons] = useState(false);
+  const [iconUrlDraft, setIconUrlDraft] = useState("");
+  const [iconPreviewStatus, setIconPreviewStatus] =
+    useState<IconPreviewStatus>("idle");
   const [backupWarningDismissed, setBackupWarningDismissed] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
   const [serverMenuOpen, setServerMenuOpen] = useState(false);
@@ -221,6 +228,7 @@ export default function Home() {
   const [volume, setVolume] = useState("5");
   const [badge, setBadge] = useState("");
   const [icon, setIcon] = useState("");
+  const [iconLibrary, setIconLibrary] = useState<string[]>([]);
   const [jumpUrl, setJumpUrl] = useState("");
   const [copy, setCopy] = useState("");
   const [autoCopy, setAutoCopy] = useState(false);
@@ -284,6 +292,8 @@ export default function Home() {
       setAutoCopy(preferences.autoCopy);
       setIsArchive(preferences.isArchive);
       setShowAdvanced(preferences.showAdvanced);
+      setIconLibrary(preferences.iconLibrary);
+      setIcon(preferences.selectedIcon);
     } catch {
       setNotice({ type: "error", text: "本地配置读取失败，已使用默认设置。" });
     } finally {
@@ -313,10 +323,14 @@ export default function Home() {
       autoCopy,
       isArchive,
       showAdvanced,
+      iconLibrary,
+      selectedIcon: icon,
     });
   }, [
     autoCopy,
     isArchive,
+    icon,
+    iconLibrary,
     level,
     ready,
     showAdvanced,
@@ -591,6 +605,54 @@ export default function Home() {
     );
   }
 
+  function isValidIconUrl(value: string) {
+    try {
+      const url = new URL(value);
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }
+
+  function openIconAdd() {
+    setIconUrlDraft("");
+    setIconPreviewStatus("idle");
+    setShowIconAdd(true);
+  }
+
+  function updateIconUrlDraft(value: string) {
+    setIconUrlDraft(value);
+    const trimmed = value.trim();
+    setIconPreviewStatus(
+      !trimmed ? "idle" : isValidIconUrl(trimmed) ? "loading" : "error",
+    );
+  }
+
+  function addIcon(event: FormEvent) {
+    event.preventDefault();
+    const url = iconUrlDraft.trim();
+    if (!isValidIconUrl(url)) {
+      setIconPreviewStatus("error");
+      return;
+    }
+    if (iconLibrary.includes(url)) {
+      setNotice({
+        type: "error",
+        text: tr("这个图标已经添加过了。", "This icon has already been added."),
+      });
+      return;
+    }
+    if (iconPreviewStatus !== "ready") return;
+
+    setIconLibrary((current) => [...current, url]);
+    setIcon(url);
+    setShowIconAdd(false);
+    setNotice({
+      type: "success",
+      text: tr("图标已添加并选中。", "Icon added and selected."),
+    });
+  }
+
   async function sendPush(event: FormEvent) {
     event.preventDefault();
     if (!activeServer || selectedDevices.length === 0 || !body.trim()) return;
@@ -785,6 +847,18 @@ export default function Home() {
       });
     }
 
+    if (confirmTarget.kind === "icon") {
+      setIconLibrary((current) =>
+        current.filter((url) => url !== confirmTarget.url),
+      );
+      setIcon((current) => (current === confirmTarget.url ? "" : current));
+      if (iconLibrary.length === 1) setEditingIcons(false);
+      setNotice({
+        type: "success",
+        text: tr("图标已删除。", "Icon deleted."),
+      });
+    }
+
     if (confirmTarget.kind === "clear") {
       setConfig(DEFAULT_CONFIG);
       setSelectedDeviceIds([]);
@@ -797,6 +871,8 @@ export default function Home() {
       setAutoCopy(DEFAULT_COMPOSER_PREFERENCES.autoCopy);
       setIsArchive(DEFAULT_COMPOSER_PREFERENCES.isArchive);
       setShowAdvanced(DEFAULT_COMPOSER_PREFERENCES.showAdvanced);
+      setIconLibrary(DEFAULT_COMPOSER_PREFERENCES.iconLibrary);
+      setIcon(DEFAULT_COMPOSER_PREFERENCES.selectedIcon);
       setNotice({
         type: "success",
         text: tr("本地配置已清除。", "Local configuration cleared."),
@@ -1074,25 +1150,6 @@ export default function Home() {
                   placeholder={tr("例如：今日提醒", "For example: Today’s reminder")}
                 />
               </label>
-              <label className="field">
-                <span>{tr("副标题", "Subtitle")} <em>{tr("可选", "Optional")}</em></span>
-                <input
-                  value={subtitle}
-                  onChange={(event) => setSubtitle(event.target.value)}
-                  placeholder={tr("显示在标题与正文之间", "Shown between the title and message")}
-                />
-              </label>
-            </div>
-
-            <div className="field-row compact-row">
-              <label className="field">
-                <span>{tr("通知分组", "Group")} <em>{tr("可选", "Optional")}</em></span>
-                <input
-                  value={group}
-                  onChange={(event) => setGroup(event.target.value)}
-                  placeholder={tr("例如：日常通知", "For example: Daily")}
-                />
-              </label>
               <div className="field format-field">
                 <span>
                   {tr("内容格式", "Message format")}{" "}
@@ -1120,6 +1177,81 @@ export default function Home() {
                     Markdown
                   </button>
                 </div>
+              </div>
+            </div>
+
+            <div className="icon-library-field">
+              <div className="icon-library-heading">
+                <span>
+                  {tr("通知图标", "Notification icon")}{" "}
+                  <em>{tr("可选", "Optional")}</em>
+                </span>
+                {iconLibrary.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingIcons((current) => !current)}
+                  >
+                    {editingIcons
+                      ? tr("完成", "Done")
+                      : tr("编辑", "Edit")}
+                  </button>
+                )}
+              </div>
+              <div className="icon-library-strip">
+                <button
+                  className="icon-choice icon-add-choice"
+                  type="button"
+                  onClick={openIconAdd}
+                  aria-label={tr("添加通知图标", "Add notification icon")}
+                  title={tr("添加图标", "Add icon")}
+                >
+                  <span>＋</span>
+                </button>
+                {iconLibrary.map((url) => {
+                  const selected = icon === url;
+                  return (
+                    <div className="icon-choice-wrap" key={url}>
+                      <button
+                        className={`icon-choice ${selected ? "selected" : ""}`}
+                        type="button"
+                        onClick={() =>
+                          setIcon((current) => (current === url ? "" : url))
+                        }
+                        aria-pressed={selected}
+                        aria-label={
+                          selected
+                            ? tr(
+                                "取消选择这个通知图标",
+                                "Deselect this notification icon",
+                              )
+                            : tr(
+                                "选择这个通知图标",
+                                "Select this notification icon",
+                              )
+                        }
+                        title={url}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt="" />
+                      </button>
+                      {editingIcons && (
+                        <button
+                          className="icon-choice-delete"
+                          type="button"
+                          onClick={() =>
+                            setConfirmTarget({ kind: "icon", url })
+                          }
+                          aria-label={tr(
+                            "删除这个通知图标",
+                            "Delete this notification icon",
+                          )}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -1215,6 +1347,34 @@ export default function Home() {
             {showAdvanced && (
               <div className="advanced-grid">
                 <label className="field">
+                  <span>
+                    {tr("副标题", "Subtitle")}{" "}
+                    <em>{tr("可选", "Optional")}</em>
+                  </span>
+                  <input
+                    value={subtitle}
+                    onChange={(event) => setSubtitle(event.target.value)}
+                    placeholder={tr(
+                      "显示在标题与正文之间",
+                      "Shown between the title and message",
+                    )}
+                  />
+                </label>
+                <label className="field">
+                  <span>
+                    {tr("通知分组", "Group")}{" "}
+                    <em>{tr("可选", "Optional")}</em>
+                  </span>
+                  <input
+                    value={group}
+                    onChange={(event) => setGroup(event.target.value)}
+                    placeholder={tr(
+                      "例如：日常通知",
+                      "For example: Daily",
+                    )}
+                  />
+                </label>
+                <label className="field">
                   <span>{tr("角标数字", "Badge number")}</span>
                   <input
                     value={badge}
@@ -1222,15 +1382,6 @@ export default function Home() {
                     type="number"
                     min="0"
                     placeholder={tr("例如：1", "For example: 1")}
-                  />
-                </label>
-                <label className="field">
-                  <span>{tr("图标 URL", "Icon URL")}</span>
-                  <input
-                    value={icon}
-                    onChange={(event) => setIcon(event.target.value)}
-                    type="url"
-                    placeholder="https://…"
                   />
                 </label>
                 <label className="field">
@@ -1288,6 +1439,109 @@ export default function Home() {
           </form>
         </section>
       </div>
+
+      {showIconAdd && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={() => setShowIconAdd(false)}
+        >
+          <section
+            className="import-modal icon-add-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="icon-add-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <span className="eyebrow">
+                  {tr("图标库", "Icon library")}
+                </span>
+                <h2 id="icon-add-title">
+                  {tr("添加通知图标", "Add notification icon")}
+                </h2>
+              </div>
+              <button
+                className="close-button"
+                type="button"
+                onClick={() => setShowIconAdd(false)}
+                aria-label={tr("关闭添加图标窗口", "Close add icon dialog")}
+              >
+                ×
+              </button>
+            </div>
+            <form className="icon-add-form" onSubmit={addIcon}>
+              <label>
+                <span>{tr("图标 URL", "Icon URL")}</span>
+                <input
+                  value={iconUrlDraft}
+                  onChange={(event) => updateIconUrlDraft(event.target.value)}
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://…"
+                  autoFocus
+                />
+              </label>
+              <div
+                className={`icon-preview ${iconPreviewStatus}`}
+                aria-live="polite"
+              >
+                {isValidIconUrl(iconUrlDraft.trim()) ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      key={iconUrlDraft.trim()}
+                      src={iconUrlDraft.trim()}
+                      alt={tr("通知图标预览", "Notification icon preview")}
+                      onLoad={() => setIconPreviewStatus("ready")}
+                      onError={() => setIconPreviewStatus("error")}
+                    />
+                    <span>
+                      {iconPreviewStatus === "ready" &&
+                        tr("图片加载成功", "Image loaded")}
+                      {iconPreviewStatus === "loading" &&
+                        tr("正在加载预览…", "Loading preview…")}
+                      {iconPreviewStatus === "error" &&
+                        tr("无法加载这张图片", "This image could not be loaded")}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="icon-preview-placeholder">＋</span>
+                    <span>
+                      {iconPreviewStatus === "error"
+                        ? tr(
+                            "请输入有效的 HTTP 或 HTTPS 图片地址",
+                            "Enter a valid HTTP or HTTPS image URL",
+                          )
+                        : tr(
+                            "粘贴地址后将在这里预览",
+                            "Paste a URL to preview it here",
+                          )}
+                    </span>
+                  </>
+                )}
+              </div>
+              <div className="import-actions">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setShowIconAdd(false)}
+                >
+                  {tr("取消", "Cancel")}
+                </button>
+                <button
+                  className="save-button"
+                  type="submit"
+                  disabled={iconPreviewStatus !== "ready"}
+                >
+                  {tr("添加并选中", "Add and select")}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
 
       {showImport && (
         <div
@@ -1633,6 +1887,8 @@ export default function Home() {
                   tr("移除这个设备？", "Remove this device?")}
                 {confirmTarget.kind === "server" &&
                   tr("删除这个服务器？", "Delete this server?")}
+                {confirmTarget.kind === "icon" &&
+                  tr("删除这个图标？", "Delete this icon?")}
                 {confirmTarget.kind === "clear" &&
                   tr("清除全部本地数据？", "Clear all local data?")}
               </h2>
@@ -1648,6 +1904,11 @@ export default function Home() {
                     `“${confirmTarget.server.name}” and its ${deviceCount(
                       confirmTarget.server.devices.length,
                     )} will be deleted.`,
+                  )}
+                {confirmTarget.kind === "icon" &&
+                  tr(
+                    "这个通知图标将从浏览器本地图标库中删除。",
+                    "This notification icon will be removed from the local icon library.",
                   )}
                 {confirmTarget.kind === "clear" &&
                   tr(

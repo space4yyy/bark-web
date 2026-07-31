@@ -6,6 +6,8 @@ export type ComposerPreferences = {
   autoCopy: boolean;
   isArchive: boolean;
   showAdvanced: boolean;
+  iconLibrary: string[];
+  selectedIcon: string;
 };
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -48,10 +50,22 @@ export const DEFAULT_COMPOSER_PREFERENCES: ComposerPreferences = {
   autoCopy: false,
   isArchive: true,
   showAdvanced: false,
+  iconLibrary: [],
+  selectedIcon: "",
 };
 
 function booleanOrDefault(value: unknown, fallback: boolean) {
   return typeof value === "boolean" ? value : fallback;
+}
+
+function isHttpUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 export function readComposerPreferences(
@@ -69,6 +83,14 @@ export function readComposerPreferences(
     )
       ? (parsed.level as ComposerPreferences["level"])
       : DEFAULT_COMPOSER_PREFERENCES.level;
+    const iconLibrary = Array.isArray(parsed.iconLibrary)
+      ? Array.from(new Set(parsed.iconLibrary.filter(isHttpUrl)))
+      : DEFAULT_COMPOSER_PREFERENCES.iconLibrary;
+    const selectedIcon =
+      typeof parsed.selectedIcon === "string" &&
+      iconLibrary.includes(parsed.selectedIcon)
+        ? parsed.selectedIcon
+        : DEFAULT_COMPOSER_PREFERENCES.selectedIcon;
 
     return {
       useMarkdown: booleanOrDefault(
@@ -97,6 +119,8 @@ export function readComposerPreferences(
         parsed.showAdvanced,
         DEFAULT_COMPOSER_PREFERENCES.showAdvanced,
       ),
+      iconLibrary,
+      selectedIcon,
     };
   } catch {
     return DEFAULT_COMPOSER_PREFERENCES;

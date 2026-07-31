@@ -32,6 +32,11 @@ test("round-trips every persistent composer preference", () => {
     autoCopy: true,
     isArchive: false,
     showAdvanced: true,
+    iconLibrary: [
+      "https://file.space4.ink/759676328_n.jpg",
+      "https://example.com/alert.png",
+    ],
+    selectedIcon: "https://file.space4.ink/759676328_n.jpg",
   };
 
   writeComposerPreferences(storage, preferences);
@@ -50,6 +55,8 @@ test("falls back safely when stored composer preferences are invalid", () => {
       autoCopy: null,
       isArchive: "false",
       showAdvanced: [],
+      iconLibrary: ["javascript:alert(1)", 42],
+      selectedIcon: "https://example.com/missing.png",
     }),
   );
 
@@ -57,6 +64,27 @@ test("falls back safely when stored composer preferences are invalid", () => {
     readComposerPreferences(storage),
     DEFAULT_COMPOSER_PREFERENCES,
   );
+});
+
+test("restores an empty icon selection and removes invalid or duplicate icons", () => {
+  const storage = memoryStorage(
+    JSON.stringify({
+      version: 1,
+      iconLibrary: [
+        "https://file.space4.ink/759676328_n.jpg",
+        "https://file.space4.ink/759676328_n.jpg",
+        "data:image/png;base64,invalid",
+      ],
+      selectedIcon: "",
+    }),
+  );
+
+  const preferences = readComposerPreferences(storage);
+
+  assert.deepEqual(preferences.iconLibrary, [
+    "https://file.space4.ink/759676328_n.jpg",
+  ]);
+  assert.equal(preferences.selectedIcon, "");
 });
 
 test("clears composer preferences from storage", () => {
