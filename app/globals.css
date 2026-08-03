@@ -1279,6 +1279,7 @@ textarea:focus {
 
 .primary-button {
   min-width: 160px;
+  max-width: 360px;
   height: 48px;
   padding: 0 18px;
   display: flex;
@@ -1292,6 +1293,13 @@ textarea:focus {
   font-weight: 800;
   box-shadow: 0 8px 20px rgba(28, 107, 72, 0.22);
   transition: transform 0.18s, background 0.18s;
+}
+
+.primary-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .primary-button:hover:not(:disabled) {
@@ -2123,6 +2131,7 @@ textarea:focus {
 
   .mobile-send-bar > button {
     min-width: 176px;
+    max-width: min(64vw, 320px);
     min-height: 48px;
     padding: 0 16px;
     border: 0;
@@ -2131,6 +2140,9 @@ textarea:focus {
     color: white;
     font-size: 11px;
     font-weight: 750;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     box-shadow: 0 8px 20px rgba(28, 107, 72, 0.2);
   }
 

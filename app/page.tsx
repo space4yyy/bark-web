@@ -13,6 +13,7 @@ import {
   sanitizeSelectedIcon,
   writeComposerPreferences,
 } from "./composer-preferences";
+import { formatSendButtonLabel } from "./recipient-label";
 
 type Device = {
   id: string;
@@ -417,6 +418,10 @@ export default function Home() {
         .map((device) => device.name)
         .join(locale === "zh" ? "、" : ", "),
     [locale, selectedDevices],
+  );
+  const sendButtonLabel = formatSendButtonLabel(
+    selectedDevices.map((device) => device.name),
+    locale,
   );
 
   function updateActiveServer(updater: (server: BarkServer) => BarkServer) {
@@ -1573,7 +1578,7 @@ export default function Home() {
                 disabled={sending || !body.trim() || selectedDevices.length === 0}
               >
                 <span>
-                  {sending ? tr("发送中…", "Sending…") : tr("发送通知", "Send notification")}
+                  {sending ? tr("发送中…", "Sending…") : sendButtonLabel}
                 </span>
               </button>
             </div>
@@ -1602,10 +1607,7 @@ export default function Home() {
                     ? tr("选择接收设备", "Choose recipients")
                     : !body.trim()
                       ? tr("请填写通知内容", "Enter a message")
-                      : tr(
-                          `发送给 ${selectedDevices.length} 个设备`,
-                          `Send to ${selectedDevices.length}`,
-                        )}
+                      : sendButtonLabel}
               </button>
             </div>
           </form>
